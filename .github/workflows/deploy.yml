@@ -1,0 +1,56 @@
+name: deploy
+
+# 代码改动即部署；每天 23:00 UTC（美股收盘后）拉一次账户数据再部署。
+# 这是唯一的部署入口，本地不跑 wrangler deploy —— 手动发版用 workflow_dispatch。
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+
+# 定时任务会把 account.json commit 回 main，两个 run 并行会 push 冲突
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # SnapTrade 的历史总资产最多回溯 1 年且是隔日粒度，每天抓一次沉淀进仓库，
+      # 才能攒出日粒度曲线。抓不到就让整个 run 失败，不要静默部署旧数据。
+      - name: 同步账户快照
+        run: npm run snaptrade:sync
+        env:
+          SNAPTRADE_CLIENT_ID: ${{ secrets.SNAPTRADE_CLIENT_ID }}
+          SNAPTRADE_CONSUMER_KEY: ${{ secrets.SNAPTRADE_CONSUMER_KEY }}
+
+      - run: npm test
+      - run: npm run build
+
+      - name: 部署到 Cloudflare Workers
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      # 部署成功之后才回写，保证仓库里的 account.json 永远等于线上那份。
+      # 用 GITHUB_TOKEN push 不会再触发本 workflow，不会循环。
+      - name: 回写 account.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/account.json
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: 同步账户快照 $(date -u +%F)"
+          git push origin HEAD:main
