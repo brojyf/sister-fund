@@ -13,7 +13,6 @@ import {
   INCEPTION,
   KNOWN_PNL_ACTIVITY_TYPES,
   NEUTRALIZED_ACTIVITY_TYPES,
-  TRADE_ACTIVITY_TYPES,
 } from './config.mjs'
 
 const OUTPUT = new URL('../src/data/account.json', import.meta.url)
@@ -54,7 +53,6 @@ const activities = activityPage?.data ?? activityPage ?? []
 
 const unknownTypes = new Set()
 const brokerAdjustments = []
-const trades = []
 
 for (const activity of activities) {
   const type = activity.type
@@ -69,28 +67,16 @@ for (const activity of activities) {
     continue
   }
 
-  if (TRADE_ACTIVITY_TYPES.has(type)) {
-    trades.push({
-      date,
-      action: type,
-      symbol: activity.symbol?.symbol ?? activity.symbol?.raw_symbol ?? '—',
-      units: Math.abs(Number(activity.units ?? 0)),
-      price: Number(activity.price ?? 0),
-    })
-  }
-
   if (!KNOWN_PNL_ACTIVITY_TYPES.has(type)) {
     unknownTypes.add(type)
   }
 }
 
-trades.sort((a, b) => a.date.localeCompare(b.date))
-
 // ── 落盘 ───────────────────────────────────────────────────
 mkdirSync(new URL('../src/data/', import.meta.url), { recursive: true })
 writeFileSync(
   OUTPUT,
-  `${JSON.stringify({ syncedAt: today, accountId: ACCOUNT_ID, snapshots, brokerAdjustments, trades }, null, 2)}\n`,
+  `${JSON.stringify({ syncedAt: today, accountId: ACCOUNT_ID, snapshots, brokerAdjustments }, null, 2)}\n`,
 )
 
 console.log(`账户快照 ${snapshots.length} 个：${snapshots[0].date} → ${snapshots[snapshots.length - 1].date}`)
@@ -98,8 +84,6 @@ console.log(`剔除的资金变动 ${brokerAdjustments.length} 笔，合计 ${br
 for (const item of brokerAdjustments) {
   console.log(`  ${item.date}  ${String(item.amount).padStart(9)}  ${item.note.slice(0, 52)}`)
 }
-console.log(`买卖 ${trades.length} 笔（只用来在账户曲线上打点）`)
-
 if (unknownTypes.size > 0) {
   console.warn(
     `\n⚠️ 出现未知活动类型 ${[...unknownTypes].join(', ')} —— ` +

@@ -13,9 +13,6 @@ export const INCEPTION = '2026-07-15'
  */
 export const NEUTRALIZED_ACTIVITY_TYPES = new Set(['CONTRIBUTION', 'WITHDRAWAL', 'FEE'])
 
-/** 画在账户曲线上的买卖打点。只影响展示，不参与任何计算 */
-export const TRADE_ACTIVITY_TYPES = new Set(['BUY', 'SELL'])
-
 /** 已知属于真实盈亏的类型。不在这两个集合里的类型会被告警，避免静默算错 */
 export const KNOWN_PNL_ACTIVITY_TYPES = new Set([
   'BUY',

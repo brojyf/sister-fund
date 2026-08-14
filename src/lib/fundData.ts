@@ -1,7 +1,6 @@
 import accountData from '../data/account.json'
 import cashFlowData from '../data/cash-flows.json'
 import type { AccountSnapshot, CashFlow } from './fund'
-import type { Trade } from './trades'
 
 /**
  * 你个人的转账和费用，用来净化收益率。
@@ -17,16 +16,6 @@ export const brokerAdjustments: CashFlow[] = accountData.brokerAdjustments.filte
 export const fundCashFlows: CashFlow[] = cashFlowData.flows
 
 export const syncedAt: string = accountData.syncedAt
-
-/**
- * 买卖记录，只用来在账户曲线上打点。
- *
- * `trades` 是后加的字段，同步过一次之前 account.json 里没有它 ——
- * 缺字段时给空数组，页面照常渲染，只是没有打点。
- */
-export const trades: Trade[] = (
-  (accountData as Record<string, unknown>).trades as Trade[] | undefined
-)?.filter((trade) => trade.action === 'BUY' || trade.action === 'SELL') ?? []
 
 /**
  * 毛毛 6/26 就把钱给我了，但 Robinhood 账户 7/15 才有钱，中间这段没有收益率可算。

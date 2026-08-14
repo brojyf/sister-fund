@@ -165,18 +165,6 @@
 .swatch--equity { border-top: 2px solid var(--accent); }
 .swatch--floor { border-top: 1.5px dashed var(--ink-faint); }
 .swatch--account { border-top: 2px solid var(--ink-soft); }
-.swatch--flow,
-.swatch--buy,
-.swatch--sell {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  border-top: 0;
-}
-.swatch--buy { background: var(--gain); }
-.swatch--sell { background: var(--loss); }
-/* 加钱取钱是空心圈，图上也这么画 */
-.swatch--flow { border: 2px solid var(--gain); }
 
 .tip {
   padding: 0.65rem 0.9rem;
@@ -206,16 +194,6 @@
   letter-spacing: 0.1em;
   color: var(--accent);
 }
-
-.tip__buy,
-.tip__sell {
-  margin: 0.3rem 0 0;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-}
-.tip__buy { color: var(--gain); }
-.tip__sell { color: var(--loss); }
 
 /* ── 规则 ───────────────────────────────── */
 

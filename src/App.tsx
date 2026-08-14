@@ -7,7 +7,7 @@ import {
   PERFORMANCE_FEE_RATE,
   type AccountReturnPoint,
 } from './lib/fund'
-import { brokerAdjustments, fundCashFlows, rawSnapshots, snapshots, trades } from './lib/fundData'
+import { brokerAdjustments, fundCashFlows, rawSnapshots, snapshots } from './lib/fundData'
 import { formatChineseDate, money, percent, signedMoney } from './lib/format'
 import { AccountChart } from './components/AccountChart'
 import { EquityChart, type EquityPoint } from './components/EquityChart'
@@ -82,20 +82,11 @@ export default function App() {
       <section className="panel" aria-label="托管账户走势">
         <h2 className="panel__title">托管账户走势</h2>
         <div className="panel__chart">
-          <AccountChart points={accountPoints} trades={trades} cashFlows={fundCashFlows} />
+          <AccountChart points={accountPoints} />
         </div>
         <ul className="legend">
           <li>
             <span className="swatch swatch--account" /> 累计收益率
-          </li>
-          <li>
-            <span className="swatch swatch--buy" /> 买入
-          </li>
-          <li>
-            <span className="swatch swatch--sell" /> 卖出
-          </li>
-          <li>
-            <span className="swatch swatch--flow" /> 加钱 / 取钱
           </li>
         </ul>
       </section>

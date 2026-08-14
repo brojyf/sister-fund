@@ -38,7 +38,7 @@ npm run snaptrade:connect  # 重新生成 Robinhood 授权链接（掉线时才�
 
 ## 数据
 
-- `src/data/account.json` — **脚本生成，别手改**。SnapTrade 返回的原始账户总资产、需要剔除的资金变动、买卖记录（`trades`，只用来在账户曲线上打点，不参与任何计算）
+- `src/data/account.json` — **脚本生成，别手改**。SnapTrade 返回的原始账户总资产、需要剔除的资金变动
 - `src/data/cash-flows.json` — **手改这个**。毛毛的加钱/取钱
 
 ## 已知限制
@@ -50,8 +50,6 @@ npm run snaptrade:connect  # 重新生成 Robinhood 授权链接（掉线时才�
 - `getUserAccountReturnRates` 端点对这个账号未开通，收益率只能自己从总资产推
 - **画不了 K 线**。账户历史每天只有一个 `total_value`，没有开高低收，
   蜡烛图缺三个数。账户走势图是折线，跟 Robinhood App 里那条一样
-- 买卖打点要对齐到快照日期：快照是隔日的，交易日常常没有对应的点，
-  每笔交易挂到当天或之后最近的一个快照上（`src/lib/trades.ts`）
 
 ## 配置
 
