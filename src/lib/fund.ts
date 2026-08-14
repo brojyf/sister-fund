@@ -4,8 +4,8 @@
  * 这里有两套完全独立的现金流，混在一起就全错了：
  *
  *   brokerAdjustments —— 你在 Robinhood 账户里的个人资金动作（转入转出、Gold 月费）。
- *                        只用来把账户总资产还原成干净的收益率。跟妹妹没关系。
- *   fundCashFlows     —— 妹妹基金的加钱/取钱，你说了算。只用来发份额、算本金。
+ *                        只用来把账户总资产还原成干净的收益率。跟毛毛没关系。
+ *   fundCashFlows     —— 毛毛基金的加钱/取钱，你说了算。只用来发份额、算本金。
  *
  * 账户负责提供「涨跌幅」，你负责提供「本金」。两者相乘才是她看到的钱。
  */
@@ -36,7 +36,7 @@ export interface FundInput {
   snapshots: AccountSnapshot[]
   /** 券商账户层面的资金进出与费用，用来净化收益率 */
   brokerAdjustments?: CashFlow[]
-  /** 妹妹基金的加钱/取钱 */
+  /** 毛毛基金的加钱/取钱 */
   fundCashFlows?: CashFlow[]
 }
 
@@ -46,13 +46,13 @@ export interface FundPoint {
   realNav: number
   /** 本月原始表现直接兑现的话的净值，用来对比抽成拿走了多少 */
   grossNav: number
-  /** 妹妹看到的净值：保底托底，超额部分抽成后 */
+  /** 毛毛看到的净值：保底托底，超额部分抽成后 */
   displayNav: number
   /** 当日保底线 */
   floorNav: number
-  /** 妹妹持有的份额 */
+  /** 毛毛持有的份额 */
   units: number
-  /** 妹妹看到的钱 = units × displayNav */
+  /** 毛毛看到的钱 = units × displayNav */
   equity: number
   /** 当日是否被保底托住了 */
   isFloored: boolean
@@ -158,7 +158,7 @@ export function buildFundSeries({
     const floorNav = segment.anchorDisplayNav * floorRatio
     const displayNav = segment.anchorDisplayNav * displayRatio
 
-    // 妹妹的钱按当日净值买份额，所以入金只增加等额的钱，不凭空产生收益
+    // 毛毛的钱按当日净值买份额，所以入金只增加等额的钱，不凭空产生收益
     // 抽成按当期新增的超额计，并且用「这期加钱之前」的份额 ——
     // 新入的钱是按已经扣过抽成的净值买的，不该再为之前的涨幅付一次钱。
     // 超额回落时增量为负，等于把没落袋的抽成退回去。

@@ -26,13 +26,13 @@ function ramp(
   return snapshots
 }
 
-/** 妹妹在第一天投入 1 万 */
+/** 毛毛在第一天投入 1 万 */
 function seedFund(startDate: string): CashFlow[] {
   return [{ date: startDate, amount: 10_000 }]
 }
 
 describe('账户只提供涨跌幅', () => {
-  it('账户规模与妹妹的本金无关，只贡献涨幅', () => {
+  it('账户规模与毛毛的本金无关，只贡献涨幅', () => {
     const snapshots = ramp('2026-01-01', 31, 5_000, 0.002)
     const points = buildFundSeries({
       snapshots,
@@ -40,7 +40,7 @@ describe('账户只提供涨跌幅', () => {
     })
 
     const last = points[points.length - 1]
-    // 账户本身只有 5000，妹妹本金 10000，净值走的是账户涨幅
+    // 账户本身只有 5000，毛毛本金 10000，净值走的是账户涨幅
     const accountRatio = snapshots[snapshots.length - 1].totalValue / 5_000
     expect(last.realNav).toBeCloseTo(accountRatio, 8)
     expect(last.grossNav).toBeCloseTo(accountRatio, 8)

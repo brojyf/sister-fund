@@ -108,38 +108,6 @@
   background: var(--rule);
 }
 
-/* ── 曲线口径切换 ───────────────────────── */
-
-.modes {
-  display: flex;
-  justify-content: center;
-  gap: 0.4rem;
-  margin-bottom: 1.2rem;
-}
-
-.modes__btn {
-  padding: 0.34rem 0.95rem;
-  border: 1px solid var(--rule);
-  background: none;
-  font-family: var(--font-body);
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  color: var(--ink-faint);
-  cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-}
-
-.modes__btn:hover {
-  color: var(--ink-soft);
-  border-color: var(--ink-faint);
-}
-
-.modes__btn--on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(180, 85, 46, 0.07);
-}
-
 /* ── 图表 ───────────────────────────────── */
 
 .chart {
@@ -176,7 +144,6 @@
 }
 .swatch--equity { border-top: 2px solid var(--accent); }
 .swatch--floor { border-top: 1.5px dashed var(--ink-faint); }
-.swatch--real { border-top: 1.5px dotted var(--ink-soft); }
 .swatch--flow {
   width: 0.5rem;
   height: 0.5rem;
@@ -249,17 +216,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── 对账：Robinhood 账户原始走势 ─────────── */
+/* ── 规则 ───────────────────────────────── */
 
-.reconcile {
+.rules {
   margin-top: clamp(2.5rem, 6vw, 4rem);
-  padding: 1.6rem 1.4rem 0.6rem;
-  border: 1px solid var(--rule);
-  background: rgba(221, 210, 190, 0.14);
 }
 
-.reconcile__title {
-  margin: 0;
+.rules__title {
+  margin: 0 0 1.1rem;
   font-family: var(--font-display);
   font-weight: 400;
   font-size: 0.95rem;
@@ -268,17 +232,43 @@
   color: var(--ink-soft);
 }
 
-.reconcile__note {
-  margin: 0.6rem 0 1.2rem;
-  max-width: 46ch;
-  font-size: 0.8rem;
-  line-height: 1.7;
-  color: var(--ink-faint);
+.rules__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 52ch;
 }
 
-.reconcile__chart {
-  height: clamp(11rem, 26vh, 15rem);
-  margin: 0 -0.5rem;
+.rules__list li {
+  position: relative;
+  padding: 0 0 0 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.85;
+  color: var(--ink-soft);
+}
+
+.rules__list li + li {
+  margin-top: 0.75rem;
+}
+
+.rules__list li::before {
+  content: '';
+  position: absolute;
+  left: 0.25rem;
+  top: 0.82em;
+  width: 0.4rem;
+  height: 1px;
+  background: var(--ink-faint);
+}
+
+.rules__list strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rules__list em {
+  font-style: normal;
+  color: var(--accent);
 }
 
 /* ── 资金流水 ───────────────────────────── */
@@ -333,45 +323,6 @@
 .flows__in { color: var(--gain); }
 .flows__out { color: var(--loss); }
 
-/* ── 页脚 ───────────────────────────────── */
-
-.colophon {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-top: 1.6rem;
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-}
-
-.colophon p {
-  margin: 0;
-}
-
-.colophon strong {
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.toggle {
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid var(--rule);
-  background: none;
-  font-family: var(--font-body);
-  font-size: 0.8rem;
-  color: var(--ink-faint);
-  cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
-}
-
-.toggle:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
 @media (max-width: 34rem) {
   .ledger {
     grid-template-columns: 1fr;
@@ -380,11 +331,7 @@
     border-left: 0;
     border-top: 1px solid var(--rule);
   }
-  .colophon {
-    justify-content: center;
-    text-align: center;
-  }
-  /* 手机上只留妹妹关心的两列，净值和份额是给你自己对账用的 */
+  /* 手机上只留毛毛关心的两列，净值和份额是给你自己对账用的 */
   .flows__table th:nth-child(n + 3),
   .flows__table td:nth-child(n + 3) {
     display: none;

@@ -1,6 +1,6 @@
-# 妹妹的基金
+# 毛毛基金
 
-给妹妹看的每日资产曲线。收益率来自 Robinhood 账户（通过 SnapTrade 只读拉取），
+给毛毛看的每日资产曲线。收益率来自 Robinhood 账户（通过 SnapTrade 只读拉取），
 本金和加钱/取钱由我手工记账，人民币计价。
 
 ## 规则
@@ -17,11 +17,11 @@
 | | 来源 | 用途 |
 |---|---|---|
 | `brokerAdjustments` | SnapTrade 活动记录里的 `CONTRIBUTION` / `WITHDRAWAL` / `FEE`，自动抓 | 把账户总资产还原成**干净的收益率** |
-| `fundCashFlows` | `src/data/cash-flows.json`，**手写** | 给妹妹**发份额、算本金** |
+| `fundCashFlows` | `src/data/cash-flows.json`，**手写** | 给毛毛**发份额、算本金** |
 
 账户里有我自己的钱进出（转账、Robinhood Gold 月费）。不剔除的话，
-账户少 100 块会被算成一次亏损，妹妹的曲线就凭空掉一块。
-反过来，妹妹的加钱是按当日净值买份额的，只增加等额的钱，不产生假收益。
+账户少 100 块会被算成一次亏损，毛毛的曲线就凭空掉一块。
+反过来，毛毛的加钱是按当日净值买份额的，只增加等额的钱，不产生假收益。
 
 **账户负责提供涨跌幅，我负责提供本金。**
 
@@ -39,13 +39,13 @@ npm run snaptrade:connect  # 重新生成 Robinhood 授权链接（掉线时才�
 ## 数据
 
 - `src/data/account.json` — **脚本生成，别手改**。SnapTrade 返回的原始账户总资产 + 需要剔除的资金变动
-- `src/data/cash-flows.json` — **手改这个**。妹妹的加钱/取钱
+- `src/data/cash-flows.json` — **手改这个**。毛毛的加钱/取钱
 
 ## 已知限制
 
 - SnapTrade 的历史总资产是**隔日**粒度，且最多回溯 1 年。从今天起每天跑一次
   `snaptrade:sync` 才能积累出日粒度
-- 账户 2026-07-15 之前是空的，算不出收益率。妹妹 6/26 就给钱了，
+- 账户 2026-07-15 之前是空的，算不出收益率。毛毛 6/26 就给钱了，
   这段空档在 `fundData.ts` 里补成「真实收益 0」，保底照给
 - `getUserAccountReturnRates` 端点对这个账号未开通，收益率只能自己从总资产推
 

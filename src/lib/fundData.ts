@@ -12,13 +12,13 @@ export const brokerAdjustments: CashFlow[] = accountData.brokerAdjustments.filte
   (adjustment) => adjustment.date > accountData.snapshots[0].date,
 )
 
-/** 妹妹基金的加钱/取钱，手写在 src/data/cash-flows.json */
+/** 毛毛基金的加钱/取钱，手写在 src/data/cash-flows.json */
 export const fundCashFlows: CashFlow[] = cashFlowData.flows
 
 export const syncedAt: string = accountData.syncedAt
 
 /**
- * 妹妹 6/26 就把钱给我了，但 Robinhood 账户 7/15 才有钱，中间这段没有收益率可算。
+ * 毛毛 6/26 就把钱给我了，但 Robinhood 账户 7/15 才有钱，中间这段没有收益率可算。
  * 补上几个持平的快照，让这段时间真实收益记为 0 —— 保底照给，不会因为账户
  * 还没开张就少给她几天。account.json 保持原样，只在这里拼装。
  */
@@ -45,10 +45,7 @@ function padToFirstDeposit(
   return [...padded, ...snapshots]
 }
 
-/** SnapTrade 返回的原始账户总资产，未做任何补齐，用于对账 */
-export const rawSnapshots: AccountSnapshot[] = accountData.snapshots
-
-/** 喂给净值计算的快照，起点对齐到妹妹第一次给钱那天 */
+/** 喂给净值计算的快照，起点对齐到毛毛第一次给钱那天 */
 export const snapshots: AccountSnapshot[] = padToFirstDeposit(
   accountData.snapshots,
   fundCashFlows,
