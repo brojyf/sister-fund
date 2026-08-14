@@ -173,9 +173,10 @@
   border-radius: 50%;
   border-top: 0;
 }
-.swatch--flow,
 .swatch--buy { background: var(--gain); }
 .swatch--sell { background: var(--loss); }
+/* 加钱取钱是空心圈，图上也这么画 */
+.swatch--flow { border: 2px solid var(--gain); }
 
 .tip {
   padding: 0.65rem 0.9rem;

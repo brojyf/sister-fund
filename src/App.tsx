@@ -67,7 +67,7 @@ export default function App() {
       <section className="panel" aria-label="你的资产">
         <h2 className="panel__title">你的资产</h2>
         <div className="panel__chart">
-          <EquityChart points={equityPoints} cashFlowRecords={cashFlowRecords} />
+          <EquityChart points={equityPoints} />
         </div>
         <ul className="legend">
           <li>
@@ -76,16 +76,13 @@ export default function App() {
           <li>
             <span className="swatch swatch--floor" /> 保底线
           </li>
-          <li>
-            <span className="swatch swatch--flow" /> 加钱 / 取钱
-          </li>
         </ul>
       </section>
 
       <section className="panel" aria-label="托管账户走势">
         <h2 className="panel__title">托管账户走势</h2>
         <div className="panel__chart">
-          <AccountChart points={accountPoints} trades={trades} />
+          <AccountChart points={accountPoints} trades={trades} cashFlows={fundCashFlows} />
         </div>
         <ul className="legend">
           <li>
@@ -96,6 +93,9 @@ export default function App() {
           </li>
           <li>
             <span className="swatch swatch--sell" /> 卖出
+          </li>
+          <li>
+            <span className="swatch swatch--flow" /> 加钱 / 取钱
           </li>
         </ul>
       </section>

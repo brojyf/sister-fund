@@ -3,13 +3,11 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
-  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import type { CashFlowRecord } from '../lib/fund'
 import { axisTicks, formatChineseDate, formatMonthDay, money, tightDomain } from '../lib/format'
 
 export interface EquityPoint {
@@ -20,11 +18,10 @@ export interface EquityPoint {
 
 interface Props {
   points: EquityPoint[]
-  cashFlowRecords: CashFlowRecord[]
 }
 
-/** 毛毛的持有金额，人民币。虚线是保底线，圆点是加钱/取钱 */
-export function EquityChart({ points, cashFlowRecords }: Props) {
+/** 毛毛的持有金额，人民币。虚线是保底线 */
+export function EquityChart({ points }: Props) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
@@ -84,20 +81,6 @@ export function EquityChart({ points, cashFlowRecords }: Props) {
           dot={false}
           isAnimationActive={false}
         />
-        {/* 第一笔是开户本金，画出来就是曲线起点上的一个赘点 */}
-        {cashFlowRecords
-          .filter((record) => record.date !== points[0]?.date)
-          .map((record) => (
-            <ReferenceDot
-              key={record.date}
-              x={record.date}
-              y={record.equityAfter}
-              r={4}
-              fill={record.amount > 0 ? '#4a6b4f' : '#a5442f'}
-              stroke="#f7f2e8"
-              strokeWidth={2}
-            />
-          ))}
       </ComposedChart>
     </ResponsiveContainer>
   )

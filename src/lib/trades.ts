@@ -29,18 +29,18 @@ function toTime(date: string): number {
 }
 
 /**
- * 把成交日补进曲线。
+ * 把要打点的日期补进曲线。
  *
- * SnapTrade 的历史数据是隔日粒度，成交日常常不在曲线上，而 Recharts 的
- * 分类轴只认数据里存在的 x 值 —— 不补进去，圆点要么被静默丢掉，要么只能
- * 挪到下一个快照日，那就不是「当天」了。
+ * SnapTrade 的历史数据是隔日粒度，成交日和加钱取钱那天常常不在曲线上，而
+ * Recharts 的分类轴只认数据里存在的 x 值 —— 不补进去，圆点要么被静默丢掉，
+ * 要么只能挪到下一个快照日，那就不是「当天」了。
  *
  * 补出来的这天没有真实快照，收益率按前后两个快照线性插值；真实快照的值
  * 一个都不动，所以曲线的形状和端点不受影响。
  */
-export function withTradeDates(
+export function withMarkerDates(
   points: AccountReturnPoint[],
-  trades: Trade[],
+  dates: string[],
 ): AccountReturnPoint[] {
   if (points.length === 0) return points
 
@@ -48,7 +48,7 @@ export function withTradeDates(
   const last = points[points.length - 1].date
   const known = new Set(points.map((point) => point.date))
 
-  const filled = [...new Set(trades.map((trade) => trade.date))]
+  const filled = [...new Set(dates)]
     .filter((date) => !known.has(date) && date > first && date < last)
     .map((date) => ({ date, returnRate: interpolate(points, date) }))
 

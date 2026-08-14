@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTradeMarkers, withTradeDates, type Trade } from './trades'
+import { buildTradeMarkers, withMarkerDates, type Trade } from './trades'
 import type { AccountReturnPoint } from './fund'
 
 /** 隔日粒度，跟 SnapTrade 返回的一样 */
@@ -13,9 +13,9 @@ function trade(date: string, action: Trade['action'], symbol = 'AAPL'): Trade {
   return { date, action, symbol, units: 1, price: 100 }
 }
 
-describe('成交日补进曲线', () => {
-  it('空档日的成交补出一个点，收益率按前后两个快照线性插值', () => {
-    const series = withTradeDates(points, [trade('2026-07-16', 'BUY')])
+describe('打点日期补进曲线', () => {
+  it('空档日补出一个点，收益率按前后两个快照线性插值', () => {
+    const series = withMarkerDates(points, ['2026-07-16'])
 
     expect(series.map((point) => point.date)).toEqual([
       '2026-07-15',
@@ -27,31 +27,31 @@ describe('成交日补进曲线', () => {
   })
 
   it('真实快照的值一个都不动', () => {
-    const series = withTradeDates(points, [trade('2026-07-16', 'BUY')])
+    const series = withMarkerDates(points, ['2026-07-16'])
 
     for (const point of points) {
       expect(series.find((candidate) => candidate.date === point.date)).toEqual(point)
     }
   })
 
-  it('成交日已经在曲线上就不补', () => {
-    expect(withTradeDates(points, [trade('2026-07-17', 'BUY')])).toBe(points)
+  it('日期已经在曲线上就不补', () => {
+    expect(withMarkerDates(points, ['2026-07-17'])).toBe(points)
   })
 
-  it('早于第一个或晚于最后一个快照的成交没法插值，不补', () => {
-    expect(withTradeDates(points, [trade('2026-07-01', 'BUY')])).toBe(points)
-    expect(withTradeDates(points, [trade('2026-07-25', 'BUY')])).toBe(points)
+  it('早于第一个或晚于最后一个快照的日期没法插值，不补', () => {
+    expect(withMarkerDates(points, ['2026-07-01'])).toBe(points)
+    expect(withMarkerDates(points, ['2026-07-25'])).toBe(points)
   })
 
   it('没有曲线就没得补', () => {
-    expect(withTradeDates([], [trade('2026-07-16', 'BUY')])).toEqual([])
+    expect(withMarkerDates([], ['2026-07-16'])).toEqual([])
   })
 })
 
 describe('买卖打点', () => {
   it('圆点落在成交当天', () => {
     const trades = [trade('2026-07-16', 'BUY')]
-    const markers = buildTradeMarkers(trades, withTradeDates(points, trades))
+    const markers = buildTradeMarkers(trades, withMarkerDates(points, ['2026-07-16']))
 
     expect(markers).toHaveLength(1)
     expect(markers[0].date).toBe('2026-07-16')
