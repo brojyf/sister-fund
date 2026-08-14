@@ -165,6 +165,7 @@
 .swatch--equity { border-top: 2px solid var(--accent); }
 .swatch--floor { border-top: 1.5px dashed var(--ink-faint); }
 .swatch--account { border-top: 2px solid var(--ink-soft); }
+.swatch--flow,
 .swatch--buy,
 .swatch--sell {
   width: 0.5rem;
@@ -172,6 +173,7 @@
   border-radius: 50%;
   border-top: 0;
 }
+.swatch--flow,
 .swatch--buy { background: var(--gain); }
 .swatch--sell { background: var(--loss); }
 

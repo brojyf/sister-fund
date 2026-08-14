@@ -67,7 +67,7 @@ export default function App() {
       <section className="panel" aria-label="你的资产">
         <h2 className="panel__title">你的资产</h2>
         <div className="panel__chart">
-          <EquityChart points={equityPoints} />
+          <EquityChart points={equityPoints} cashFlowRecords={cashFlowRecords} />
         </div>
         <ul className="legend">
           <li>
@@ -75,6 +75,9 @@ export default function App() {
           </li>
           <li>
             <span className="swatch swatch--floor" /> 保底线
+          </li>
+          <li>
+            <span className="swatch swatch--flow" /> 加钱 / 取钱
           </li>
         </ul>
       </section>

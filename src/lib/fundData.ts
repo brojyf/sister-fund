@@ -56,11 +56,52 @@ function padToFirstDeposit(
   return [...padded, ...snapshots]
 }
 
+/**
+ * 把毛毛加钱/取钱的日期补进快照。
+ *
+ * 账户快照是隔日的，8/13 给的钱本来要等 8/14 那个快照才发份额，圆点也只能
+ * 画在 8/14 —— 不是她实际给钱那天。补一个当天的快照，份额和圆点都落回当天。
+ *
+ * 补出来这天没有行情，账户价值按上一个快照带过来，再加上当天的券商资金进出
+ * （转账、月费）。这两笔在收益率里本来就要被剔除，带上它们这天的收益率正好
+ * 是 0，也不会把那笔钱的进出错算到下一个快照的涨跌里。
+ */
+function withCashFlowDates(
+  snapshots: AccountSnapshot[],
+  flows: CashFlow[],
+  adjustments: CashFlow[],
+): AccountSnapshot[] {
+  if (snapshots.length === 0) return snapshots
+
+  const realValueByDate = new Map(snapshots.map((snapshot) => [snapshot.date, snapshot.totalValue]))
+  const first = snapshots[0].date
+  const last = snapshots[snapshots.length - 1].date
+  const missing = flows
+    .map((flow) => flow.date)
+    .filter((date) => !realValueByDate.has(date) && date > first && date < last)
+
+  if (missing.length === 0) return snapshots
+
+  let carried = snapshots[0].totalValue
+  return [...new Set([...realValueByDate.keys(), ...missing])].sort().map((date) => {
+    const real = realValueByDate.get(date)
+    carried = real ?? carried + sumOn(adjustments, date)
+    return { date, totalValue: carried }
+  })
+}
+
+function sumOn(flows: CashFlow[], date: string): number {
+  return flows
+    .filter((flow) => flow.date === date)
+    .reduce((sum, flow) => sum + flow.amount, 0)
+}
+
 /** SnapTrade 返回的原始账户总资产，未做任何补齐，用于账户走势图 */
 export const rawSnapshots: AccountSnapshot[] = accountData.snapshots
 
-/** 喂给净值计算的快照，起点对齐到毛毛第一次给钱那天 */
-export const snapshots: AccountSnapshot[] = padToFirstDeposit(
-  accountData.snapshots,
+/** 喂给净值计算的快照：起点对齐到毛毛第一次给钱那天，加钱取钱那天也补上 */
+export const snapshots: AccountSnapshot[] = withCashFlowDates(
+  padToFirstDeposit(accountData.snapshots, fundCashFlows),
   fundCashFlows,
+  brokerAdjustments,
 )
