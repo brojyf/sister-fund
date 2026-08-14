@@ -85,11 +85,11 @@ export function EquityChart({ points, cashFlowRecords }: Props) {
           isAnimationActive={false}
         />
         {cashFlowRecords
-          .filter((record) => record.date !== points[0]?.date)
+          .filter((record) => record.plotDate !== points[0]?.date)
           .map((record) => (
             <ReferenceDot
-              key={record.date}
-              x={record.date}
+              key={record.plotDate}
+              x={record.plotDate}
               y={record.equityAfter}
               r={4}
               fill={record.amount > 0 ? '#4a6b4f' : '#a5442f'}

@@ -401,5 +401,7 @@ describe('基金流水', () => {
 
     expect(records[0].date).toBe('2026-07-18')
     expect(records[0].units).toBeCloseTo(3_000 / records[0].nav, 8)
+    // 圆点画在曲线上的 7-19，画在 7-18 会被 Recharts 的分类轴丢掉
+    expect(records[0].plotDate).toBe('2026-07-19')
   })
 })

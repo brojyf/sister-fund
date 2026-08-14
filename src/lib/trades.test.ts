@@ -19,7 +19,6 @@ describe('买卖打点', () => {
 
     expect(markers).toHaveLength(1)
     expect(markers[0].date).toBe('2026-07-17')
-    expect(markers[0].totalValue).toBe(2100)
   })
 
   it('同一个快照日上的多笔交易合成一个打点', () => {

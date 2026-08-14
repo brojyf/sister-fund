@@ -14,13 +14,6 @@ export const signedMoney = new Intl.NumberFormat('zh-CN', {
   signDisplay: 'always',
 })
 
-/** 托管账户是美元的 */
-export const usd = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 2,
-})
-
 export const percent = new Intl.NumberFormat('zh-CN', {
   style: 'percent',
   maximumFractionDigits: 2,

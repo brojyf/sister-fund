@@ -8,20 +8,27 @@ import {
 } from './lib/fund'
 import { brokerAdjustments, fundCashFlows, rawSnapshots, snapshots, trades } from './lib/fundData'
 import { formatChineseDate, money, percent, signedMoney } from './lib/format'
-import { AccountChart } from './components/AccountChart'
+import { AccountChart, type AccountReturnPoint } from './components/AccountChart'
 import { EquityChart, type EquityPoint } from './components/EquityChart'
 import './App.css'
 
 export default function App() {
-  const { equityPoints, summary, latestDate, cashFlowRecords } = useMemo(() => {
+  const { equityPoints, accountPoints, summary, latestDate, cashFlowRecords } = useMemo(() => {
     const points = buildFundSeries({ snapshots, brokerAdjustments, fundCashFlows })
     const equityPoints: EquityPoint[] = points.map((point) => ({
       date: point.date,
       equity: point.equity,
       floorEquity: point.units * point.floorNav,
     }))
+    // 账户曲线走同一套算法，只是不发份额：realNav 就是剔除转账和月费之后的
+    // 净涨跌，正好是「你的收益率是从哪来的」那条线，不涉及任何金额。
+    const accountPoints: AccountReturnPoint[] = buildFundSeries({
+      snapshots: rawSnapshots,
+      brokerAdjustments,
+    }).map((point) => ({ date: point.date, returnRate: point.realNav - 1 }))
     return {
       equityPoints,
+      accountPoints,
       summary: summarize(points, fundCashFlows),
       latestDate: points[points.length - 1]?.date ?? '',
       cashFlowRecords: describeCashFlows(points, fundCashFlows),
@@ -58,7 +65,6 @@ export default function App() {
 
       <section className="panel" aria-label="你的资产">
         <h2 className="panel__title">你的资产</h2>
-        <p className="panel__note">人民币。虚线是保底线，圆点是加钱和取钱。</p>
         <div className="panel__chart">
           <EquityChart points={equityPoints} cashFlowRecords={cashFlowRecords} />
         </div>
@@ -77,16 +83,12 @@ export default function App() {
 
       <section className="panel" aria-label="托管账户走势">
         <h2 className="panel__title">托管账户走势</h2>
-        <p className="panel__note">
-          账户总资产，美元。圆点是那天的买卖，鼠标停上去能看到买了什么。
-          你的收益率就是从这条线推出来的。
-        </p>
         <div className="panel__chart">
-          <AccountChart snapshots={rawSnapshots} trades={trades} />
+          <AccountChart points={accountPoints} trades={trades} />
         </div>
         <ul className="legend">
           <li>
-            <span className="swatch swatch--account" /> 账户总值
+            <span className="swatch swatch--account" /> 累计收益率
           </li>
           <li>
             <span className="swatch swatch--buy" /> 买入

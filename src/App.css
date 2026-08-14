@@ -124,14 +124,6 @@
   color: var(--ink-soft);
 }
 
-.panel__note {
-  margin: 0.6rem 0 0;
-  max-width: 46ch;
-  font-size: 0.8rem;
-  line-height: 1.7;
-  color: var(--ink-faint);
-}
-
 .panel__chart {
   height: clamp(14rem, 34vh, 20rem);
   margin: 1.1rem -0.5rem 0;
