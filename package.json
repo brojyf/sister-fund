@@ -12,7 +12,8 @@
     "snaptrade:connect": "node --env-file=.env.local scripts/snaptrade-connect.mjs",
     "snaptrade:accounts": "node --env-file=.env.local scripts/snaptrade-accounts.mjs",
     "snaptrade:sync": "node --env-file=.env.local scripts/snaptrade-sync.mjs",
-    "verify": "tsx scripts/verify-series.ts"
+    "verify": "tsx scripts/verify-series.ts",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "react": "^19.2.8",

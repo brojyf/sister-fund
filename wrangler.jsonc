@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sister-fund",
+  "compatibility_date": "2026-08-15",
+  "assets": {
+    // 纯静态 SPA：没有 Worker 脚本，所有路由都回落到 index.html
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "maomao.co-gate.com",
+      "custom_domain": true
+    }
+  ]
+}
