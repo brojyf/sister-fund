@@ -1,0 +1,87 @@
+{
+  "syncedAt": "2026-08-14",
+  "accountId": "3a21527b-b6f7-4d9f-beca-c2e058fa7934",
+  "snapshots": [
+    {
+      "date": "2026-07-15",
+      "totalValue": 2079.39
+    },
+    {
+      "date": "2026-07-17",
+      "totalValue": 2079.36
+    },
+    {
+      "date": "2026-07-19",
+      "totalValue": 2079.36
+    },
+    {
+      "date": "2026-07-21",
+      "totalValue": 2079.42
+    },
+    {
+      "date": "2026-07-23",
+      "totalValue": 2079.17
+    },
+    {
+      "date": "2026-07-25",
+      "totalValue": 2025.17
+    },
+    {
+      "date": "2026-07-27",
+      "totalValue": 2067.17
+    },
+    {
+      "date": "2026-07-29",
+      "totalValue": 1956.4
+    },
+    {
+      "date": "2026-07-31",
+      "totalValue": 2043.82
+    },
+    {
+      "date": "2026-08-02",
+      "totalValue": 2043.82
+    },
+    {
+      "date": "2026-08-04",
+      "totalValue": 2282.82
+    },
+    {
+      "date": "2026-08-06",
+      "totalValue": 2222.82
+    },
+    {
+      "date": "2026-08-08",
+      "totalValue": 2162.82
+    },
+    {
+      "date": "2026-08-10",
+      "totalValue": 2177.82
+    },
+    {
+      "date": "2026-08-12",
+      "totalValue": 2177.82
+    },
+    {
+      "date": "2026-08-14",
+      "totalValue": 2094.82
+    }
+  ],
+  "brokerAdjustments": [
+    {
+      "date": "2026-08-13",
+      "amount": -50,
+      "note": "WITHDRAWAL Transfer to Robinhood Checking account ending in 7189 of $50.00"
+    },
+    {
+      "date": "2026-08-13",
+      "amount": -50,
+      "note": "FEE Robinhood Gold monthly fee of $50.00."
+    },
+    {
+      "date": "2026-07-15",
+      "amount": 500,
+      "note": "CONTRIBUTION ACH deposit of $500 into Robinhood Brokerage account ending in 9000"
+    }
+  ]
+}
