@@ -110,12 +110,34 @@
 
 /* ── 图表 ───────────────────────────────── */
 
-.chart {
-  height: clamp(15rem, 38vh, 22rem);
-  margin: 0 -0.5rem;
+.panel {
+  margin-top: clamp(2rem, 5vw, 3rem);
 }
 
-.chart :focus-visible {
+.panel__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 0.95rem;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  color: var(--ink-soft);
+}
+
+.panel__note {
+  margin: 0.6rem 0 0;
+  max-width: 46ch;
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: var(--ink-faint);
+}
+
+.panel__chart {
+  height: clamp(14rem, 34vh, 20rem);
+  margin: 1.1rem -0.5rem 0;
+}
+
+.panel__chart :focus-visible {
   outline: none;
 }
 
@@ -144,13 +166,18 @@
 }
 .swatch--equity { border-top: 2px solid var(--accent); }
 .swatch--floor { border-top: 1.5px dashed var(--ink-faint); }
-.swatch--flow {
+.swatch--account { border-top: 2px solid var(--ink-soft); }
+.swatch--flow,
+.swatch--buy,
+.swatch--sell {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  background: var(--gain);
   border-top: 0;
 }
+.swatch--flow,
+.swatch--buy { background: var(--gain); }
+.swatch--sell { background: var(--loss); }
 
 .tip {
   padding: 0.65rem 0.9rem;
@@ -181,40 +208,15 @@
   color: var(--accent);
 }
 
-/* ── 账目 ───────────────────────────────── */
-
-.ledger {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  margin-top: clamp(2.5rem, 6vw, 4rem);
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
-}
-
-.ledger__cell {
-  padding: 1.4rem 1rem;
-  text-align: center;
-}
-
-.ledger__cell + .ledger__cell {
-  border-left: 1px solid var(--rule);
-}
-
-.ledger__label {
-  margin: 0;
-  font-size: 0.78rem;
-  letter-spacing: 0.22em;
-  text-indent: 0.22em;
-  color: var(--ink-faint);
-}
-
-.ledger__value {
-  margin: 0.55rem 0 0;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(1.1rem, 3.2vw, 1.45rem);
+.tip__buy,
+.tip__sell {
+  margin: 0.3rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
 }
+.tip__buy { color: var(--gain); }
+.tip__sell { color: var(--loss); }
 
 /* ── 规则 ───────────────────────────────── */
 
@@ -324,12 +326,9 @@
 .flows__out { color: var(--loss); }
 
 @media (max-width: 34rem) {
-  .ledger {
-    grid-template-columns: 1fr;
-  }
-  .ledger__cell + .ledger__cell {
-    border-left: 0;
-    border-top: 1px solid var(--rule);
+  .hero__deltas {
+    gap: 0.7rem;
+    font-size: 0.85rem;
   }
   /* 手机上只留毛毛关心的两列，净值和份额是给你自己对账用的 */
   .flows__table th:nth-child(n + 3),

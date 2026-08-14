@@ -3,7 +3,7 @@
  *
  *   npm run snaptrade:sync
  *
- * 这个脚本只负责「账户涨跌幅」这一半。妹妹的本金和加钱/取钱在
+ * 这个脚本只负责「账户涨跌幅」这一半。毛毛的本金和加钱/取钱在
  * src/data/cash-flows.json，那个是你手写的，脚本不碰。
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -13,6 +13,7 @@ import {
   INCEPTION,
   KNOWN_PNL_ACTIVITY_TYPES,
   NEUTRALIZED_ACTIVITY_TYPES,
+  TRADE_ACTIVITY_TYPES,
 } from './config.mjs'
 
 const OUTPUT = new URL('../src/data/account.json', import.meta.url)
@@ -53,25 +54,43 @@ const activities = activityPage?.data ?? activityPage ?? []
 
 const unknownTypes = new Set()
 const brokerAdjustments = []
+const trades = []
 
 for (const activity of activities) {
   const type = activity.type
+  const date = (activity.trade_date ?? activity.settlement_date).slice(0, 10)
+
   if (NEUTRALIZED_ACTIVITY_TYPES.has(type)) {
     brokerAdjustments.push({
-      date: (activity.trade_date ?? activity.settlement_date).slice(0, 10),
+      date,
       amount: Number(activity.amount),
       note: `${type} ${activity.description ?? ''}`.trim(),
     })
-  } else if (!KNOWN_PNL_ACTIVITY_TYPES.has(type)) {
+    continue
+  }
+
+  if (TRADE_ACTIVITY_TYPES.has(type)) {
+    trades.push({
+      date,
+      action: type,
+      symbol: activity.symbol?.symbol ?? activity.symbol?.raw_symbol ?? '—',
+      units: Math.abs(Number(activity.units ?? 0)),
+      price: Number(activity.price ?? 0),
+    })
+  }
+
+  if (!KNOWN_PNL_ACTIVITY_TYPES.has(type)) {
     unknownTypes.add(type)
   }
 }
+
+trades.sort((a, b) => a.date.localeCompare(b.date))
 
 // ── 落盘 ───────────────────────────────────────────────────
 mkdirSync(new URL('../src/data/', import.meta.url), { recursive: true })
 writeFileSync(
   OUTPUT,
-  `${JSON.stringify({ syncedAt: today, accountId: ACCOUNT_ID, snapshots, brokerAdjustments }, null, 2)}\n`,
+  `${JSON.stringify({ syncedAt: today, accountId: ACCOUNT_ID, snapshots, brokerAdjustments, trades }, null, 2)}\n`,
 )
 
 console.log(`账户快照 ${snapshots.length} 个：${snapshots[0].date} → ${snapshots[snapshots.length - 1].date}`)
@@ -79,6 +98,7 @@ console.log(`剔除的资金变动 ${brokerAdjustments.length} 笔，合计 ${br
 for (const item of brokerAdjustments) {
   console.log(`  ${item.date}  ${String(item.amount).padStart(9)}  ${item.note.slice(0, 52)}`)
 }
+console.log(`买卖 ${trades.length} 笔（只用来在账户曲线上打点）`)
 
 if (unknownTypes.size > 0) {
   console.warn(
