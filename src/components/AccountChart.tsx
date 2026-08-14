@@ -9,7 +9,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { buildTradeMarkers, type Trade } from '../lib/trades'
+import type { AccountReturnPoint } from '../lib/fund'
+import { buildTradeMarkers, withTradeDates, type Trade } from '../lib/trades'
 import { axisTicks, formatChineseDate, formatMonthDay, percent, tightDomain } from '../lib/format'
 
 const BUY_COLOR = '#4a6b4f'
@@ -22,26 +23,22 @@ const MARKER_COLOR: Record<string, string> = {
   both: BOTH_COLOR,
 }
 
-/** 托管账户自基金成立以来的累计收益率，已剔除转账和月费 */
-export interface AccountReturnPoint {
-  date: string
-  returnRate: number
-}
-
 interface Props {
   points: AccountReturnPoint[]
   trades: Trade[]
 }
 
-/** 托管账户的累计收益率走势，买卖打点画在曲线上 */
+/** 托管账户的累计收益率走势，买卖打点画在成交当天 */
 export function AccountChart({ points, trades }: Props) {
-  const markers = buildTradeMarkers(trades, points)
+  // 成交日先补进曲线，圆点才能落在当天而不是被挪到下一个快照日
+  const series = withTradeDates(points, trades)
+  const markers = buildTradeMarkers(trades, series)
   const markersByDate = new Map(markers.map((marker) => [marker.date, marker]))
-  const returnByDate = new Map(points.map((point) => [point.date, point.returnRate]))
+  const returnByDate = new Map(series.map((point) => [point.date, point.returnRate]))
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
+      <ComposedChart data={series} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
         <defs>
           <linearGradient id="accountFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#6b6055" stopOpacity={0.18} />

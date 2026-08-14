@@ -117,16 +117,22 @@
 .panel__title {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 0.95rem;
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
-  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
+  color: var(--ink);
 }
 
 .panel__chart {
   height: clamp(14rem, 34vh, 20rem);
   margin: 1.1rem -0.5rem 0;
+}
+
+/* Recharts 给图表容器加了 tabindex，点一下就描个黑框。图表不是控件，不要 */
+.panel__chart :focus,
+.panel__chart :focus-visible {
+  outline: none;
 }
 
 .panel__chart :focus-visible {
@@ -159,7 +165,6 @@
 .swatch--equity { border-top: 2px solid var(--accent); }
 .swatch--floor { border-top: 1.5px dashed var(--ink-faint); }
 .swatch--account { border-top: 2px solid var(--ink-soft); }
-.swatch--flow,
 .swatch--buy,
 .swatch--sell {
   width: 0.5rem;
@@ -167,7 +172,6 @@
   border-radius: 50%;
   border-top: 0;
 }
-.swatch--flow,
 .swatch--buy { background: var(--gain); }
 .swatch--sell { background: var(--loss); }
 
@@ -219,11 +223,11 @@
 .rules__title {
   margin: 0 0 1.1rem;
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 0.95rem;
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
-  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
+  color: var(--ink);
 }
 
 .rules__list {
@@ -274,11 +278,11 @@
 .flows__title {
   margin: 0 0 1rem;
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 0.95rem;
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
-  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
+  color: var(--ink);
 }
 
 .flows__table {
@@ -330,4 +334,16 @@
   .flows__table td:first-child {
     white-space: nowrap;
   }
+}
+
+/* ── 页脚 ───────────────────────────────── */
+
+.footer {
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--rule);
+  text-align: center;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
 }

@@ -23,6 +23,13 @@ export interface AccountSnapshot {
   totalValue: number
 }
 
+/** 托管账户累计收益率曲线上的一个点，已剔除转账和月费 */
+export interface AccountReturnPoint {
+  /** YYYY-MM-DD */
+  date: string
+  returnRate: number
+}
+
 /** 一笔资金变动。正数进，负数出 */
 export interface CashFlow {
   /** YYYY-MM-DD */
@@ -191,13 +198,6 @@ export function buildFundSeries({
 
 /** 一笔基金流水，附上成交当日的净值和买到的份额 */
 export interface CashFlowRecord extends CashFlow {
-  /**
-   * 这笔钱落在曲线上的哪一天。
-   *
-   * 快照是隔日的，流水日期常常不在曲线上，而 Recharts 的分类轴只认曲线上
-   * 存在的 x 值 —— 拿原始 date 打点会被静默丢掉，圆点就凭空消失了。
-   */
-  plotDate: string
   /** 成交当日净值 */
   nav: number
   /** 这笔钱增发（正）或赎回（负）的份额 */
@@ -220,7 +220,6 @@ export function describeCashFlows(
       if (!point) return null
       return {
         ...flow,
-        plotDate: point.date,
         nav: point.displayNav,
         units: flow.amount / point.displayNav,
         equityAfter: point.equity,
