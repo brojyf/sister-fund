@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildAccountReturnSeries,
   buildFundSeries,
   describeCashFlows,
   summarize,
@@ -450,5 +451,72 @@ describe('基金流水', () => {
 
     expect(records[0].date).toBe('2026-07-18')
     expect(records[0].units).toBeCloseTo(3_000 / records[0].nav, 8)
+  })
+})
+
+describe('托管账户收益率（本金口径）', () => {
+  const initialPrincipal = 2_000
+
+  it('入金当天分母跟着变大，钱变多不算成赚了', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-12', totalValue: 2_100 }, // 2100 / 2000
+      { date: '2026-08-14', totalValue: 2_152.5 }, // 2152.5 / 2050，还是 5%
+    ]
+    const deposit: CashFlow[] = [{ date: '2026-08-14', amount: 50 }]
+    const points = buildAccountReturnSeries(snapshots, deposit, initialPrincipal)
+
+    expect(points[0].returnRate).toBeCloseTo(0.05, 10)
+    expect(points[1].returnRate).toBeCloseTo(0.05, 10)
+  })
+
+  it('转出和月费缩小分母，钱变少不算成亏了', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-12', totalValue: 2_100 },
+      { date: '2026-08-14', totalValue: 1_995 }, // 1995 / 1900，还是 5%
+    ]
+    const outflows: CashFlow[] = [
+      { date: '2026-08-13', amount: -50 }, // 转到 Robinhood Banking
+      { date: '2026-08-13', amount: -50 }, // Gold 月费
+    ]
+    const points = buildAccountReturnSeries(snapshots, outflows, initialPrincipal)
+
+    expect(points[1].returnRate).toBeCloseTo(0.05, 10)
+  })
+
+  it('隔日快照上，落在空档日的入金也要计进分母', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-12', totalValue: 2_100 },
+      { date: '2026-08-14', totalValue: 2_152.5 },
+    ]
+    // 8/13 没有快照。按日期累加而不是按快照窗口取，才不会漏掉这笔
+    const gapDayDeposit: CashFlow[] = [{ date: '2026-08-13', amount: 50 }]
+    const points = buildAccountReturnSeries(snapshots, gapDayDeposit, initialPrincipal)
+
+    expect(points[1].returnRate).toBeCloseTo(0.05, 10)
+  })
+
+  it('一进一出的撤回转账，撤回之后回到原来的收益率', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-10', totalValue: 2_100 },
+      { date: '2026-08-12', totalValue: 2_257.5 }, // 2257.5 / 2150
+      { date: '2026-08-14', totalValue: 2_100 },
+    ]
+    const reversed: CashFlow[] = [
+      { date: '2026-08-11', amount: 150 },
+      { date: '2026-08-13', amount: -150 },
+    ]
+    const points = buildAccountReturnSeries(snapshots, reversed, initialPrincipal)
+
+    for (const point of points) expect(point.returnRate).toBeCloseTo(0.05, 10)
+  })
+
+  it('快照乱序进来也按日期升序输出', () => {
+    const shuffled: AccountSnapshot[] = [
+      { date: '2026-08-14', totalValue: 2_200 },
+      { date: '2026-08-10', totalValue: 2_100 },
+    ]
+    const points = buildAccountReturnSeries(shuffled, [], initialPrincipal)
+
+    expect(points.map((point) => point.date)).toEqual(['2026-08-10', '2026-08-14'])
   })
 })

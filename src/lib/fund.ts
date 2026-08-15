@@ -30,6 +30,34 @@ export interface AccountReturnPoint {
   returnRate: number
 }
 
+/**
+ * 托管账户的累计收益率，本金口径：总资产 ÷ 当日净入金 − 1。
+ *
+ * 不要拿 buildFundSeries 的 realNav 来画这条线。那是时间加权收益率，
+ * 账户快照是隔日的，一笔入金落在空档日就会被当成当天的暴涨，链式相乘之后
+ * 误差滚起来 —— 2026-08-15 两种算法差了 4 个百分点（2.31% vs 6.55%）。
+ * Robinhood App 上显示的是本金口径，首页那个累计收益率也是，三处得说同一件事。
+ *
+ * 时间加权那套仍然是对的，但那是给毛毛发份额、算保底和分成用的：她的钱是
+ * 分几次进来的，只能按当日净值买份额。账户这条线没有份额可发，直接比本金。
+ */
+export function buildAccountReturnSeries(
+  snapshots: AccountSnapshot[],
+  brokerAdjustments: CashFlow[],
+  initialPrincipal: number,
+): AccountReturnPoint[] {
+  return [...snapshots]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ date, totalValue }) => {
+      const principal =
+        initialPrincipal +
+        brokerAdjustments
+          .filter((adjustment) => adjustment.date <= date)
+          .reduce((sum, adjustment) => sum + adjustment.amount, 0)
+      return { date, returnRate: principal > 0 ? totalValue / principal - 1 : 0 }
+    })
+}
+
 /** 一笔资金变动。正数进，负数出 */
 export interface CashFlow {
   /** YYYY-MM-DD */

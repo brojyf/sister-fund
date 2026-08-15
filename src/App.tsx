@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import {
+  buildAccountReturnSeries,
   buildFundSeries,
   describeCashFlows,
   summarize,
@@ -7,7 +8,13 @@ import {
   PERFORMANCE_FEE_RATE,
   type AccountReturnPoint,
 } from './lib/fund'
-import { brokerAdjustments, fundCashFlows, rawSnapshots, snapshots } from './lib/fundData'
+import {
+  accountInitialPrincipal,
+  brokerAdjustments,
+  fundCashFlows,
+  rawSnapshots,
+  snapshots,
+} from './lib/fundData'
 import { formatChineseDate, money, percent, signedMoney } from './lib/format'
 import { AccountChart } from './components/AccountChart'
 import { EquityChart, type EquityPoint } from './components/EquityChart'
@@ -21,12 +28,13 @@ export default function App() {
       equity: point.equity,
       floorEquity: point.units * point.floorNav,
     }))
-    // 账户曲线走同一套算法，只是不发份额：realNav 就是剔除转账和月费之后的
-    // 净涨跌，正好是「你的收益率是从哪来的」那条线，不涉及任何金额。
-    const accountPoints: AccountReturnPoint[] = buildFundSeries({
-      snapshots: rawSnapshots,
+    // 账户曲线是本金口径：总资产比净入金。跟 Robinhood App 上那个数一致，
+    // 也跟首页的累计收益率一个口径。
+    const accountPoints: AccountReturnPoint[] = buildAccountReturnSeries(
+      rawSnapshots,
       brokerAdjustments,
-    }).map((point) => ({ date: point.date, returnRate: point.realNav - 1 }))
+      accountInitialPrincipal,
+    )
     return {
       equityPoints,
       accountPoints,

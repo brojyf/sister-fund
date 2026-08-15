@@ -18,6 +18,14 @@ export const brokerAdjustments: CashFlow[] = [
   ...manualAdjustmentData.adjustments,
 ].filter((adjustment) => adjustment.date > accountData.snapshots[0].date)
 
+/**
+ * 账户开张时投进去的本金，托管账户收益率的分母。
+ *
+ * 不能拿第一个快照当分母：那天账户已经是 2079.39，里面含了开张到 7/15 之间
+ * 赚的钱，拿它当基准会把这段收益抹平成 0。
+ */
+export const accountInitialPrincipal: number = manualAdjustmentData.initialPrincipal
+
 /** 毛毛基金的加钱/取钱，手写在 src/data/cash-flows.json */
 export const fundCashFlows: CashFlow[] = cashFlowData.flows
 
