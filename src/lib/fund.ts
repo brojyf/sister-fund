@@ -4,7 +4,8 @@
  * 这里有两套完全独立的现金流，混在一起就全错了：
  *
  *   brokerAdjustments —— 你在 Robinhood 账户里的个人资金动作（转入转出、Gold 月费）。
- *                        只用来把账户总资产还原成干净的收益率。跟毛毛没关系。
+ *                        手写在 src/data/adjustment.json，只用来把账户总资产
+ *                        还原成干净的收益率。跟毛毛没关系。
  *   fundCashFlows     —— 毛毛基金的加钱/取钱，你说了算。只用来发份额、算本金。
  *
  * 账户负责提供「涨跌幅」，你负责提供「本金」。两者相乘才是她看到的钱。
@@ -23,7 +24,7 @@ export interface AccountSnapshot {
   totalValue: number
 }
 
-/** 托管账户累计收益率曲线上的一个点，已剔除转账和月费 */
+/** 托管账户累计涨跌幅曲线上的一个点 */
 export interface AccountReturnPoint {
   /** YYYY-MM-DD */
   date: string
@@ -31,31 +32,20 @@ export interface AccountReturnPoint {
 }
 
 /**
- * 托管账户的累计收益率，本金口径：总资产 ÷ 当日净入金 − 1。
+ * 托管账户的累计涨跌幅：以第一个快照为基准，直接比总资产。
  *
- * 不要拿 buildFundSeries 的 realNav 来画这条线。那是时间加权收益率，
- * 账户快照是隔日的，一笔入金落在空档日就会被当成当天的暴涨，链式相乘之后
- * 误差滚起来 —— 2026-08-15 两种算法差了 4 个百分点（2.31% vs 6.55%）。
- * Robinhood App 上显示的是本金口径，首页那个累计收益率也是，三处得说同一件事。
+ * 这条线**不剔除资金进出**，它回答的是「账户里的钱比开张那天多了多少」。
+ * 入金那天会有一段台阶，看着像暴涨 —— 那是这个口径本身如此，不是算错。
+ * 只用 account.json，不依赖任何手写数据，所以永远画到最新一个快照日。
  *
- * 时间加权那套仍然是对的，但那是给毛毛发份额、算保底和分成用的：她的钱是
- * 分几次进来的，只能按当日净值买份额。账户这条线没有份额可发，直接比本金。
+ * 要干净收益率的是毛毛那条曲线（buildFundSeries 的 realNav），它按
+ * adjustment.json 里手写的资金流把转账和月费剔掉。两条线口径不同是刻意的。
  */
-export function buildAccountReturnSeries(
-  snapshots: AccountSnapshot[],
-  brokerAdjustments: CashFlow[],
-  initialPrincipal: number,
-): AccountReturnPoint[] {
-  return [...snapshots]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map(({ date, totalValue }) => {
-      const principal =
-        initialPrincipal +
-        brokerAdjustments
-          .filter((adjustment) => adjustment.date <= date)
-          .reduce((sum, adjustment) => sum + adjustment.amount, 0)
-      return { date, returnRate: principal > 0 ? totalValue / principal - 1 : 0 }
-    })
+export function buildAccountReturnSeries(snapshots: AccountSnapshot[]): AccountReturnPoint[] {
+  const ordered = [...snapshots].sort((a, b) => a.date.localeCompare(b.date))
+  const base = ordered[0]?.totalValue
+  if (!base || base <= 0) return []
+  return ordered.map(({ date, totalValue }) => ({ date, returnRate: totalValue / base - 1 }))
 }
 
 /** 一笔资金变动。正数进，负数出 */

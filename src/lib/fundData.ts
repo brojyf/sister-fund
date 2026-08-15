@@ -1,30 +1,17 @@
 import accountData from '../data/account.json'
-import manualAdjustmentData from '../data/broker-adjustments.json'
+import adjustmentData from '../data/adjustment.json'
 import cashFlowData from '../data/cash-flows.json'
-import type { AccountSnapshot, CashFlow } from './fund'
+import { type AccountSnapshot, type CashFlow } from './fund'
 
 /**
- * 你个人的转账和费用，用来净化收益率。
+ * 账户层面的资金进出，手写在 src/data/adjustment.json，用来净化毛毛那条曲线。
  *
- * 同步来的（account.json）和手工补录的（broker-adjustments.json）合在一起：
- * 失败又撤回的转账在 SnapTrade 的活动列表里一条都不留，只看账户余额就是
- * 一根凭空的尖刺，收益率会把它当成真涨真跌。
- *
- * 只保留第一个真实快照之后的：在那之前账户是空的、快照是补齐出来的，
- * 拿一笔入金去除一个伪造的前值，只会算出一个假的暴跌。
+ * 只能手写：sync 不拉 SnapTrade 的活动列表，而且失败又撤回的转账在活动列表里
+ * 一条都不留。JSON 里字段叫 notes，这里对齐到 CashFlow 的 note。
  */
-export const brokerAdjustments: CashFlow[] = [
-  ...accountData.brokerAdjustments,
-  ...manualAdjustmentData.adjustments,
-].filter((adjustment) => adjustment.date > accountData.snapshots[0].date)
-
-/**
- * 账户开张时投进去的本金，托管账户收益率的分母。
- *
- * 不能拿第一个快照当分母：那天账户已经是 2079.39，里面含了开张到 7/15 之间
- * 赚的钱，拿它当基准会把这段收益抹平成 0。
- */
-export const accountInitialPrincipal: number = manualAdjustmentData.initialPrincipal
+export const brokerAdjustments: CashFlow[] = adjustmentData.adjustments.map(
+  ({ date, amount, notes }) => ({ date, amount, note: notes }),
+)
 
 /** 毛毛基金的加钱/取钱，手写在 src/data/cash-flows.json */
 export const fundCashFlows: CashFlow[] = cashFlowData.flows
@@ -62,8 +49,5 @@ function padToFirstDeposit(
 /** SnapTrade 返回的原始账户总资产，未做任何补齐，用于账户走势图 */
 export const rawSnapshots: AccountSnapshot[] = accountData.snapshots
 
-/** 喂给净值计算的快照，起点对齐到毛毛第一次给钱那天 */
-export const snapshots: AccountSnapshot[] = padToFirstDeposit(
-  accountData.snapshots,
-  fundCashFlows,
-)
+/** 喂给净值计算的快照：起点对齐到毛毛第一次给钱那天 */
+export const snapshots: AccountSnapshot[] = padToFirstDeposit(rawSnapshots, fundCashFlows)

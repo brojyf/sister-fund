@@ -4,7 +4,8 @@
  *   npm run verify
  *
  * 重点看两件事：
- *   1. 8/13 那笔 -$100（转出 + Gold 月费）有没有被误算成亏损
+ *   1. 账户里我个人的转账和月费有没有被误算成盈亏 —— 漏写 adjustment.json
+ *      的日子会在「当期涨跌」那列冒出一个跟行情无关的大数
  *   2. 展示净值在账户走平/下跌时是不是贴着保底线
  */
 import { buildFundSeries } from '../src/lib/fund'

@@ -7,60 +7,120 @@
       "totalValue": 2079.39
     },
     {
+      "date": "2026-07-16",
+      "totalValue": 2130.63
+    },
+    {
       "date": "2026-07-17",
       "totalValue": 2079.36
+    },
+    {
+      "date": "2026-07-18",
+      "totalValue": 2130.52
     },
     {
       "date": "2026-07-19",
       "totalValue": 2079.36
     },
     {
+      "date": "2026-07-20",
+      "totalValue": 2130.65
+    },
+    {
       "date": "2026-07-21",
       "totalValue": 2079.42
+    },
+    {
+      "date": "2026-07-22",
+      "totalValue": 2130.46
     },
     {
       "date": "2026-07-23",
       "totalValue": 2079.17
     },
     {
+      "date": "2026-07-24",
+      "totalValue": 2076.33
+    },
+    {
       "date": "2026-07-25",
       "totalValue": 2025.17
+    },
+    {
+      "date": "2026-07-26",
+      "totalValue": 2076.33
     },
     {
       "date": "2026-07-27",
       "totalValue": 2067.17
     },
     {
+      "date": "2026-07-28",
+      "totalValue": 2156.56
+    },
+    {
       "date": "2026-07-29",
       "totalValue": 1956.4
+    },
+    {
+      "date": "2026-07-30",
+      "totalValue": 2129.56
     },
     {
       "date": "2026-07-31",
       "totalValue": 2043.82
     },
     {
+      "date": "2026-08-01",
+      "totalValue": 2094.98
+    },
+    {
       "date": "2026-08-02",
       "totalValue": 2043.82
+    },
+    {
+      "date": "2026-08-03",
+      "totalValue": 2266.98
     },
     {
       "date": "2026-08-04",
       "totalValue": 2282.82
     },
     {
+      "date": "2026-08-05",
+      "totalValue": 2288.98
+    },
+    {
       "date": "2026-08-06",
       "totalValue": 2222.82
+    },
+    {
+      "date": "2026-08-07",
+      "totalValue": 2213.98
     },
     {
       "date": "2026-08-08",
       "totalValue": 2162.82
     },
     {
+      "date": "2026-08-09",
+      "totalValue": 2213.98
+    },
+    {
       "date": "2026-08-10",
       "totalValue": 2177.82
     },
     {
+      "date": "2026-08-11",
+      "totalValue": 2228.98
+    },
+    {
       "date": "2026-08-12",
       "totalValue": 2177.82
+    },
+    {
+      "date": "2026-08-13",
+      "totalValue": 2145.98
     },
     {
       "date": "2026-08-14",
@@ -68,24 +128,7 @@
     },
     {
       "date": "2026-08-15",
-      "totalValue": 2077.82
-    }
-  ],
-  "brokerAdjustments": [
-    {
-      "date": "2026-08-13",
-      "amount": -50,
-      "note": "WITHDRAWAL Transfer to Robinhood Checking account ending in 7189 of $50.00"
-    },
-    {
-      "date": "2026-08-13",
-      "amount": -50,
-      "note": "FEE Robinhood Gold monthly fee of $50.00."
-    },
-    {
-      "date": "2026-07-15",
-      "amount": 500,
-      "note": "CONTRIBUTION ACH deposit of $500 into Robinhood Brokerage account ending in 9000"
+      "totalValue": 2132.98
     }
   ]
 }

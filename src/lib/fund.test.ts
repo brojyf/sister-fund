@@ -454,69 +454,85 @@ describe('基金流水', () => {
   })
 })
 
-describe('托管账户收益率（本金口径）', () => {
-  const initialPrincipal = 2_000
-
-  it('入金当天分母跟着变大，钱变多不算成赚了', () => {
+describe('托管账户涨跌幅（不剔资金）', () => {
+  it('以第一个快照为基准，直接比总资产', () => {
     const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-12', totalValue: 2_100 }, // 2100 / 2000
-      { date: '2026-08-14', totalValue: 2_152.5 }, // 2152.5 / 2050，还是 5%
-    ]
-    const deposit: CashFlow[] = [{ date: '2026-08-14', amount: 50 }]
-    const points = buildAccountReturnSeries(snapshots, deposit, initialPrincipal)
-
-    expect(points[0].returnRate).toBeCloseTo(0.05, 10)
-    expect(points[1].returnRate).toBeCloseTo(0.05, 10)
-  })
-
-  it('转出和月费缩小分母，钱变少不算成亏了', () => {
-    const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-12', totalValue: 2_100 },
-      { date: '2026-08-14', totalValue: 1_995 }, // 1995 / 1900，还是 5%
-    ]
-    const outflows: CashFlow[] = [
-      { date: '2026-08-13', amount: -50 }, // 转到 Robinhood Banking
-      { date: '2026-08-13', amount: -50 }, // Gold 月费
-    ]
-    const points = buildAccountReturnSeries(snapshots, outflows, initialPrincipal)
-
-    expect(points[1].returnRate).toBeCloseTo(0.05, 10)
-  })
-
-  it('隔日快照上，落在空档日的入金也要计进分母', () => {
-    const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-12', totalValue: 2_100 },
-      { date: '2026-08-14', totalValue: 2_152.5 },
-    ]
-    // 8/13 没有快照。按日期累加而不是按快照窗口取，才不会漏掉这笔
-    const gapDayDeposit: CashFlow[] = [{ date: '2026-08-13', amount: 50 }]
-    const points = buildAccountReturnSeries(snapshots, gapDayDeposit, initialPrincipal)
-
-    expect(points[1].returnRate).toBeCloseTo(0.05, 10)
-  })
-
-  it('一进一出的撤回转账，撤回之后回到原来的收益率', () => {
-    const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-10', totalValue: 2_100 },
-      { date: '2026-08-12', totalValue: 2_257.5 }, // 2257.5 / 2150
+      { date: '2026-08-12', totalValue: 2_000 },
       { date: '2026-08-14', totalValue: 2_100 },
     ]
-    const reversed: CashFlow[] = [
-      { date: '2026-08-11', amount: 150 },
-      { date: '2026-08-13', amount: -150 },
-    ]
-    const points = buildAccountReturnSeries(snapshots, reversed, initialPrincipal)
+    const points = buildAccountReturnSeries(snapshots)
 
-    for (const point of points) expect(point.returnRate).toBeCloseTo(0.05, 10)
+    expect(points[0].returnRate).toBe(0)
+    expect(points[1].returnRate).toBeCloseTo(0.05, 10)
   })
 
-  it('快照乱序进来也按日期升序输出', () => {
+  it('入金也算进涨跌幅，这条线本来就不剔资金', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-12', totalValue: 2_000 },
+      { date: '2026-08-14', totalValue: 2_500 }, // 全是入金，一分没赚
+    ]
+    const points = buildAccountReturnSeries(snapshots)
+
+    expect(points[1].returnRate).toBeCloseTo(0.25, 10)
+  })
+
+  it('每个快照日都出点，不会因为缺手写数据而停住', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-10', totalValue: 2_000 },
+      { date: '2026-08-12', totalValue: 2_100 },
+      { date: '2026-08-14', totalValue: 2_200 },
+    ]
+    const points = buildAccountReturnSeries(snapshots)
+
+    expect(points.map((point) => point.date)).toEqual([
+      '2026-08-10',
+      '2026-08-12',
+      '2026-08-14',
+    ])
+  })
+
+  it('快照乱序进来也按日期升序输出，基准取最早那天', () => {
     const shuffled: AccountSnapshot[] = [
       { date: '2026-08-14', totalValue: 2_200 },
-      { date: '2026-08-10', totalValue: 2_100 },
+      { date: '2026-08-10', totalValue: 2_000 },
     ]
-    const points = buildAccountReturnSeries(shuffled, [], initialPrincipal)
+    const points = buildAccountReturnSeries(shuffled)
 
     expect(points.map((point) => point.date)).toEqual(['2026-08-10', '2026-08-14'])
+    expect(points[1].returnRate).toBeCloseTo(0.1, 10)
+  })
+
+  it('没有快照就没有曲线', () => {
+    expect(buildAccountReturnSeries([])).toEqual([])
+  })
+})
+
+describe('手写资金流净化毛毛的曲线', () => {
+  it('入金当天的增量被剔掉，净值不动', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-12', totalValue: 2_000 },
+      { date: '2026-08-14', totalValue: 2_500 }, // 全是入金，一分没赚
+    ]
+    const points = buildFundSeries({
+      snapshots,
+      brokerAdjustments: [{ date: '2026-08-14', amount: 500 }],
+    })
+
+    expect(points[1].realNav).toBeCloseTo(1, 10)
+  })
+
+  it('只修当天，之后的日子不受影响', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-12', totalValue: 2_000 },
+      { date: '2026-08-14', totalValue: 2_500 }, // 入金 500
+      { date: '2026-08-16', totalValue: 2_625 }, // 真涨 5%
+    ]
+    const points = buildFundSeries({
+      snapshots,
+      brokerAdjustments: [{ date: '2026-08-14', amount: 500 }],
+    })
+
+    expect(points[1].realNav).toBeCloseTo(1, 10)
+    expect(points[2].realNav).toBeCloseTo(1.05, 10)
   })
 })

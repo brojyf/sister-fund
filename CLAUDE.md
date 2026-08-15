@@ -33,8 +33,8 @@ npm run snaptrade:sync # 拉 SnapTrade → 覆写 src/data/account.json（需要
 SnapTrade API
    │ scripts/snaptrade-sync.mjs（每天 CI 跑一次）
    ▼
-src/data/account.json          脚本生成，整个覆写，别手改
-src/data/broker-adjustments.json  手写：开张本金 + 脚本抓不到的资金进出
+src/data/account.json             脚本生成，整个覆写，别手改
+src/data/adjustment.json          手写：托管账户里我个人的转账/月费（美元）
 src/data/cash-flows.json          手写：毛毛的加钱/取钱（人民币）
    │ src/lib/fundData.ts  —— 唯一把三份 JSON 拼成计算输入的地方
    ▼
@@ -54,21 +54,21 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 详见 `README.md` 和 `fund.ts` 顶部注释。把其中一个传给另一个参数，测试不一定
 挂，但曲线会静默算错。
 
-**两个收益率口径不能混。** 托管账户图和首页累计收益率用本金口径
-（`buildAccountReturnSeries`），毛毛的资产曲线用时间加权
-（`buildFundSeries` 的 `realNav`/`displayNav`）。这不是历史遗留，是刻意的，
-理由写在 `buildAccountReturnSeries` 的注释里。
+**两个口径不能混。** 托管账户图画的是**不剔资金的涨跌幅**
+（`buildAccountReturnSeries`，只吃 `account.json`），毛毛的资产曲线是**剔掉
+资金进出的时间加权**（`buildFundSeries` 的 `realNav`/`displayNav`）。账户那条
+线上入金会显出台阶，这是刻意的，别「顺手修好」——理由写在
+`buildAccountReturnSeries` 的注释里。
 
-**账户快照是隔日的。** 任何按「相邻两个快照」做的计算都必须用
+**账户快照可能是隔日的。** 任何按「相邻两个快照」做的计算都必须用
 `sumInWindow` 那种区间归集，不能假设资金变动一定落在快照日上。新写的
 `describeCashFlows` 类逻辑同理，要处理流水日期不在快照日的情况。
 
-**补录写 `broker-adjustments.json`，不写 `account.json`。** 后者每次 sync
-被整个覆写。失败/撤回的转账在 SnapTrade 活动列表里查不到，只能手工补，规则
-（Canceled / Reversed / Pending 各怎么处理）写在该文件的 `_comment` 里。
-
-**`config.mjs` 的两个活动类型集合要一起维护。** 出现不在任何一个集合里的类型，
-sync 会告警但仍按真实盈亏处理 —— 看到告警要判断它是不是资金搬运。
+**资金流水写 `adjustment.json`，不写 `account.json`。** 后者每次 sync 被整个
+覆写。`adjustment.json` 写的是**当天的增量**（正进负出，美元），不是累计余额：
+只修当天那一笔，之后的日子不受影响。漏写不会让测试挂，只会让那笔转账被静默
+算成毛毛的涨跌，`npm run verify` 的「当期涨跌」列能看出来。JSON 里字段叫
+`notes`，`fundData.ts` 对齐到 `CashFlow` 的 `note`。
 
 ## 部署
 

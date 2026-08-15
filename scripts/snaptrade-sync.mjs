@@ -1,24 +1,19 @@
 /**
- * 从 SnapTrade 拉取账户历史总资产和资金变动，写入 src/data/account.json。
+ * 从 SnapTrade 拉取账户历史总资产，写入 src/data/account.json。
  *
  *   npm run snaptrade:sync
  *
  * 这个脚本只负责「账户涨跌幅」这一半。毛毛的本金和加钱/取钱在
  * src/data/cash-flows.json，那个是你手写的，脚本不碰。
  *
- * account.json 每次都被整个覆写，所以补录不要写进去：SnapTrade 活动列表里
- * 没有的资金进出（失败又撤回的转账就是这样）手写在
- * src/data/broker-adjustments.json，脚本同样不碰那个文件。
+ * 账户里我个人的转账和月费也不归这个脚本管：SnapTrade 的活动列表漏掉失败又
+ * 撤回的转账，所以那是一份手写的 src/data/adjustment.json。脚本不去拉活动
+ * 列表 —— 拉回来也没人用，还会误导下一个人去合并它。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { snaptrade } from './snaptrade-client.mjs'
 import { mergeSnapshots } from './snapshot-history.mjs'
-import {
-  ACCOUNT_ID,
-  INCEPTION,
-  KNOWN_PNL_ACTIVITY_TYPES,
-  NEUTRALIZED_ACTIVITY_TYPES,
-} from './config.mjs'
+import { ACCOUNT_ID, INCEPTION } from './config.mjs'
 
 const OUTPUT = new URL('../src/data/account.json', import.meta.url)
 
@@ -50,55 +45,16 @@ if (snapshots.length === 0) {
   throw new Error(`${INCEPTION} 之后没有任何账户快照，检查 ACCOUNT_ID 和 INCEPTION`)
 }
 
-// ── 资金变动 ───────────────────────────────────────────────
-const { data: activityPage } = await snaptrade.accountInformation.getAccountActivities({
-  accountId: ACCOUNT_ID,
-  startDate: INCEPTION,
-  endDate: today,
-})
-const activities = activityPage?.data ?? activityPage ?? []
-
-const unknownTypes = new Set()
-const brokerAdjustments = []
-
-for (const activity of activities) {
-  const type = activity.type
-  const date = (activity.trade_date ?? activity.settlement_date).slice(0, 10)
-
-  if (NEUTRALIZED_ACTIVITY_TYPES.has(type)) {
-    brokerAdjustments.push({
-      date,
-      amount: Number(activity.amount),
-      note: `${type} ${activity.description ?? ''}`.trim(),
-    })
-    continue
-  }
-
-  if (!KNOWN_PNL_ACTIVITY_TYPES.has(type)) {
-    unknownTypes.add(type)
-  }
-}
-
 // ── 落盘 ───────────────────────────────────────────────────
 mkdirSync(new URL('../src/data/', import.meta.url), { recursive: true })
 writeFileSync(
   OUTPUT,
-  `${JSON.stringify({ syncedAt: today, accountId: ACCOUNT_ID, snapshots, brokerAdjustments }, null, 2)}\n`,
+  `${JSON.stringify({ syncedAt: today, accountId: ACCOUNT_ID, snapshots }, null, 2)}\n`,
 )
 
 console.log(
   `账户快照 ${snapshots.length} 个（本次新增 ${snapshots.length - recorded.length}）：` +
     `${snapshots[0].date} → ${snapshots[snapshots.length - 1].date}`,
 )
-console.log(`剔除的资金变动 ${brokerAdjustments.length} 笔，合计 ${brokerAdjustments.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}`)
-for (const item of brokerAdjustments) {
-  console.log(`  ${item.date}  ${String(item.amount).padStart(9)}  ${item.note.slice(0, 52)}`)
-}
-if (unknownTypes.size > 0) {
-  console.warn(
-    `\n⚠️ 出现未知活动类型 ${[...unknownTypes].join(', ')} —— ` +
-      '它们目前被当作真实盈亏。如果其实是资金搬运，加进 config.mjs 的 NEUTRALIZED_ACTIVITY_TYPES。',
-  )
-}
 
-console.log(`\n已写入 src/data/account.json`)
+console.log(`已写入 src/data/account.json`)

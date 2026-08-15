@@ -8,13 +8,7 @@ import {
   PERFORMANCE_FEE_RATE,
   type AccountReturnPoint,
 } from './lib/fund'
-import {
-  accountInitialPrincipal,
-  brokerAdjustments,
-  fundCashFlows,
-  rawSnapshots,
-  snapshots,
-} from './lib/fundData'
+import { brokerAdjustments, fundCashFlows, rawSnapshots, snapshots } from './lib/fundData'
 import { formatChineseDate, money, percent, signedMoney } from './lib/format'
 import { AccountChart } from './components/AccountChart'
 import { EquityChart, type EquityPoint } from './components/EquityChart'
@@ -28,13 +22,9 @@ export default function App() {
       equity: point.equity,
       floorEquity: point.units * point.floorNav,
     }))
-    // 账户曲线是本金口径：总资产比净入金。跟 Robinhood App 上那个数一致，
-    // 也跟首页的累计收益率一个口径。
-    const accountPoints: AccountReturnPoint[] = buildAccountReturnSeries(
-      rawSnapshots,
-      brokerAdjustments,
-      accountInitialPrincipal,
-    )
+    // 账户曲线画的是账户总资产比开张那天的涨跌幅，不剔资金进出 ——
+    // 只吃 account.json，永远画到最新一个快照日
+    const accountPoints: AccountReturnPoint[] = buildAccountReturnSeries(rawSnapshots)
     return {
       equityPoints,
       accountPoints,
@@ -94,7 +84,7 @@ export default function App() {
         </div>
         <ul className="legend">
           <li>
-            <span className="swatch swatch--account" /> 累计收益率
+            <span className="swatch swatch--account" /> 累计涨跌幅
           </li>
         </ul>
       </section>
