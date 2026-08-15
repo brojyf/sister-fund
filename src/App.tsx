@@ -129,11 +129,6 @@ export default function App() {
             超过保底的部分，管理人分走一半，其余全部归你。
           </li>
           <li>
-            <strong>按自然月结算</strong>
-            <span className="rules__dash">——</span>
-            每个月初重新起算。上个月已经到手的收益，不会被这个月的回撤吃掉。
-          </li>
-          <li>
             <strong>加钱按当天净值折算份额</strong>
             <span className="rules__dash">——</span>
             加进来的钱只增加本金，不会凭空多出收益，也不会拉低你已有的收益率。
