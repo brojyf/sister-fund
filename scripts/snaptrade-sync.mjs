@@ -5,6 +5,10 @@
  *
  * 这个脚本只负责「账户涨跌幅」这一半。毛毛的本金和加钱/取钱在
  * src/data/cash-flows.json，那个是你手写的，脚本不碰。
+ *
+ * account.json 每次都被整个覆写，所以补录不要写进去：SnapTrade 活动列表里
+ * 没有的资金进出（失败又撤回的转账就是这样）手写在
+ * src/data/broker-adjustments.json，脚本同样不碰那个文件。
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { snaptrade } from './snaptrade-client.mjs'

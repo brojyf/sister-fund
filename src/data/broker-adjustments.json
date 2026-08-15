@@ -1,0 +1,15 @@
+{
+  "_comment": "同步脚本抓不到的账户资金进出，手写在这里。npm run snaptrade:sync 会整个覆写 account.json，所以补录必须放在这个文件里。正数进，负数出，单位美元，和 account.json 的 brokerAdjustments 合并后一起从收益率里剔除。失败/撤回的转账要一进一出成对补，只补一条会在另一头留下反向的假波动。",
+  "adjustments": [
+    {
+      "date": "2026-08-04",
+      "amount": 150,
+      "note": "入金到账，SnapTrade 无活动记录（转账后来失败）"
+    },
+    {
+      "date": "2026-08-06",
+      "amount": -150,
+      "note": "上面那笔失败后撤回"
+    }
+  ]
+}

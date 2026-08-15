@@ -1,16 +1,22 @@
 import accountData from '../data/account.json'
+import manualAdjustmentData from '../data/broker-adjustments.json'
 import cashFlowData from '../data/cash-flows.json'
 import type { AccountSnapshot, CashFlow } from './fund'
 
 /**
  * 你个人的转账和费用，用来净化收益率。
  *
+ * 同步来的（account.json）和手工补录的（broker-adjustments.json）合在一起：
+ * 失败又撤回的转账在 SnapTrade 的活动列表里一条都不留，只看账户余额就是
+ * 一根凭空的尖刺，收益率会把它当成真涨真跌。
+ *
  * 只保留第一个真实快照之后的：在那之前账户是空的、快照是补齐出来的，
  * 拿一笔入金去除一个伪造的前值，只会算出一个假的暴跌。
  */
-export const brokerAdjustments: CashFlow[] = accountData.brokerAdjustments.filter(
-  (adjustment) => adjustment.date > accountData.snapshots[0].date,
-)
+export const brokerAdjustments: CashFlow[] = [
+  ...accountData.brokerAdjustments,
+  ...manualAdjustmentData.adjustments,
+].filter((adjustment) => adjustment.date > accountData.snapshots[0].date)
 
 /** 毛毛基金的加钱/取钱，手写在 src/data/cash-flows.json */
 export const fundCashFlows: CashFlow[] = cashFlowData.flows
