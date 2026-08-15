@@ -1,18 +1,19 @@
 /**
  * 基金净值计算。
  *
- * 这里有两套完全独立的现金流，混在一起就全错了：
+ * 输入只有两样：账户每日总资产（美元，account.json）和毛毛的加钱/取钱
+ * （人民币，cash-flows.json）。账户负责提供「涨跌幅」，你负责提供「本金」，
+ * 两者相乘才是她看到的钱。
  *
- *   brokerAdjustments —— 你在 Robinhood 账户里的个人资金动作（转入转出、Gold 月费）。
- *                        手写在 src/data/adjustment.json，只用来把账户总资产
- *                        还原成干净的收益率。跟毛毛没关系。
- *   fundCashFlows     —— 毛毛基金的加钱/取钱，你说了算。只用来发份额、算本金。
+ * **账户总资产的变动一律当成真实涨跌。** 券商层面的资金进出（你自己的转账、
+ * Gold 月费）没有单独的台账去剔除了 —— 要不让它污染毛毛的曲线，就在
+ * account.json 里把那天的总资产写成扣掉这笔钱之后的值。
  *
- * 账户负责提供「涨跌幅」，你负责提供「本金」。两者相乘才是她看到的钱。
+ * 保底每天 0.01% 复利，超额部分抽成 50%，两者都以自然月为结算单位（锚点每月重置）。
  */
 
-/** 每月保底收益率。跌破由你补足 */
-export const MONTHLY_FLOOR_RATE = 0.003
+/** 每日保底收益率，按自然日复利。跌破由你补足（连着 30 天就是 0.30%） */
+export const DAILY_FLOOR_RATE = 0.0001
 
 /** 超过保底的部分，你抽走的比例 */
 export const PERFORMANCE_FEE_RATE = 0.5
@@ -32,20 +33,24 @@ export interface AccountReturnPoint {
 }
 
 /**
- * 托管账户的累计涨跌幅：以第一个快照为基准，直接比总资产。
+ * 托管账户的涨跌幅：总资产 ÷ 起始资金 − 1。
  *
- * 这条线**不剔除资金进出**，它回答的是「账户里的钱比开张那天多了多少」。
- * 入金那天会有一段台阶，看着像暴涨 —— 那是这个口径本身如此，不是算错。
- * 只用 account.json，不依赖任何手写数据，所以永远画到最新一个快照日。
+ * 基数是**固定的起始资金**（这个账户是 $2,000），不是第一个快照的值。用第一个
+ * 快照当基准的话，只要那天的数值有偏差，整条曲线就整体平移；固定基数则是一句
+ * 能对着 Robinhood App 心算验证的话：「本金 2000，现在 2132.98，涨 6.65%」。
  *
- * 要干净收益率的是毛毛那条曲线（buildFundSeries 的 realNav），它按
- * adjustment.json 里手写的资金流把转账和月费剔掉。两条线口径不同是刻意的。
+ * 这条线回答的是「账户里的钱比投进去的本金多了多少」，是账户的绝对水位；
+ * 毛毛那条（buildFundSeries 的 displayNav）是逐日复利链，还叠了保底和抽成。
+ * 两条线口径不同是刻意的。
  */
-export function buildAccountReturnSeries(snapshots: AccountSnapshot[]): AccountReturnPoint[] {
-  const ordered = [...snapshots].sort((a, b) => a.date.localeCompare(b.date))
-  const base = ordered[0]?.totalValue
-  if (!base || base <= 0) return []
-  return ordered.map(({ date, totalValue }) => ({ date, returnRate: totalValue / base - 1 }))
+export function buildAccountReturnSeries(
+  snapshots: AccountSnapshot[],
+  baseCapital: number,
+): AccountReturnPoint[] {
+  if (!(baseCapital > 0)) return []
+  return [...snapshots]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(({ date, totalValue }) => ({ date, returnRate: totalValue / baseCapital - 1 }))
 }
 
 /** 一笔资金变动。正数进，负数出 */
@@ -59,8 +64,6 @@ export interface CashFlow {
 
 export interface FundInput {
   snapshots: AccountSnapshot[]
-  /** 券商账户层面的资金进出与费用，用来净化收益率 */
-  brokerAdjustments?: CashFlow[]
   /** 毛毛基金的加钱/取钱 */
   fundCashFlows?: CashFlow[]
 }
@@ -96,11 +99,6 @@ function daysBetween(from: string, to: string): number {
   return (parseDate(to).getTime() - parseDate(from).getTime()) / MS_PER_DAY
 }
 
-function daysInMonth(date: string): number {
-  const [year, month] = date.split('-').map(Number)
-  return new Date(Date.UTC(year, month, 0)).getUTCDate()
-}
-
 function monthKey(date: string): string {
   return date.slice(0, 7)
 }
@@ -126,11 +124,7 @@ interface MonthSegment {
   anchorDisplayNav: number
 }
 
-export function buildFundSeries({
-  snapshots,
-  brokerAdjustments = [],
-  fundCashFlows = [],
-}: FundInput): FundPoint[] {
+export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): FundPoint[] {
   const ordered = [...snapshots].sort((a, b) => a.date.localeCompare(b.date))
   if (ordered.length === 0) return []
 
@@ -152,10 +146,9 @@ export function buildFundSeries({
 
     if (i > 0) {
       const previousValue = ordered[i - 1].totalValue
-      const adjustment = sumInWindow(brokerAdjustments, previousDate, date)
-      // 剔除你个人的转账和费用之后，剩下的才是真实涨跌
-      const dailyReturn =
-        previousValue > 0 ? (totalValue - adjustment) / previousValue - 1 : 0
+      // 账户总资产的变动全部当成真实涨跌。要剔掉自己的转账和月费，
+      // 就在 account.json 里把当天的总资产写成扣掉那笔钱之后的值。
+      const dailyReturn = previousValue > 0 ? totalValue / previousValue - 1 : 0
       realNav *= 1 + dailyReturn
 
       const previous = points[i - 1]
@@ -169,11 +162,12 @@ export function buildFundSeries({
       }
     }
 
-    // 保底和抽成都以「本月」为结算单位：锚点每月重置，所以上个月已兑现的
-    // 收益不会被这个月吃掉，这个月的抽成也不会追溯上个月。
+    // 保底逐日累加，但**结算单位仍然是自然月**：锚点每月重置，所以上个月已兑现的
+    // 收益不会被这个月吃掉，这个月的抽成也不会追溯上个月。保底线是从当月锚点起
+    // 按天数复利长出来的，不是从开张那天一路长上来的。
+    // 用自然日天数而不是快照个数：快照断了一天，那天的保底也照给。
     const realRatio = realNav / segment.anchorRealNav
-    const progress = daysBetween(segment.anchorDate, date) / daysInMonth(date)
-    const floorRatio = (1 + MONTHLY_FLOOR_RATE) ** progress
+    const floorRatio = (1 + DAILY_FLOOR_RATE) ** daysBetween(segment.anchorDate, date)
 
     // 跑赢保底的部分抽走一半；跑输就由保底线托住，不倒扣
     const excessRatio = Math.max(0, realRatio - floorRatio)
@@ -214,33 +208,42 @@ export function buildFundSeries({
   return points
 }
 
-/** 一笔基金流水，附上成交当日的净值和买到的份额 */
+/** 一笔基金流水，附上它到今天为止赚了多少 */
 export interface CashFlowRecord extends CashFlow {
-  /** 成交当日净值 */
-  nav: number
-  /** 这笔钱增发（正）或赎回（负）的份额 */
-  units: number
-  /** 成交后她的总资产 */
-  equityAfter: number
+  /**
+   * 这笔钱从进来那天到最新一天赚了多少。
+   * 取钱是把钱拿走，没有「到今天赚了多少」可言，记 null。
+   */
+  gain: number | null
+  /** 这笔钱的累计收益率，口径同上 */
+  returnRate: number | null
 }
 
 /**
- * 把基金流水对齐到净值曲线上。流水日期如果不在快照日上
- * （账户快照是隔日的），归到之后第一个有快照的那天。
+ * 把基金流水对齐到净值曲线上，算出每一笔到今天赚了多少。
+ *
+ * 每笔钱是按进来那天的净值买的份额，所以它自己的收益率就是
+ * 「最新净值 ÷ 进来那天的净值 − 1」—— 后进来的钱只跟了一小段，
+ * 收益率天然低于整体涨幅，这正是要分笔展示的原因。
+ *
+ * 流水日期如果不在快照日上，归到之后第一个有快照的那天。
  */
 export function describeCashFlows(
   points: FundPoint[],
   fundCashFlows: CashFlow[],
 ): CashFlowRecord[] {
+  const latest = points[points.length - 1]
+  if (!latest) return []
+
   return fundCashFlows
     .map((flow) => {
       const point = points.find((candidate) => candidate.date >= flow.date)
       if (!point) return null
+      const returnRate = flow.amount > 0 ? latest.displayNav / point.displayNav - 1 : null
       return {
         ...flow,
-        nav: point.displayNav,
-        units: flow.amount / point.displayNav,
-        equityAfter: point.equity,
+        returnRate,
+        gain: returnRate === null ? null : flow.amount * returnRate,
       }
     })
     .filter((record): record is CashFlowRecord => record !== null)

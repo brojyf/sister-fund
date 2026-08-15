@@ -4,14 +4,14 @@
  *   npm run verify
  *
  * 重点看两件事：
- *   1. 账户里我个人的转账和月费有没有被误算成盈亏 —— 漏写 adjustment.json
- *      的日子会在「当期涨跌」那列冒出一个跟行情无关的大数
+ *   1. 「当期涨跌」那列有没有跟行情无关的大数 —— 那说明 account.json 里那天的
+ *      总资产含了我自己的转账或月费，得手工扣掉
  *   2. 展示净值在账户走平/下跌时是不是贴着保底线
  */
 import { buildFundSeries } from '../src/lib/fund'
-import { brokerAdjustments, fundCashFlows, snapshots } from '../src/lib/fundData'
+import { fundCashFlows, snapshots } from '../src/lib/fundData'
 
-const points = buildFundSeries({ snapshots, brokerAdjustments, fundCashFlows })
+const points = buildFundSeries({ snapshots, fundCashFlows })
 
 const valueByDate = new Map(snapshots.map((s) => [s.date, s.totalValue]))
 

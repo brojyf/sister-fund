@@ -60,27 +60,8 @@ describe('账户只提供涨跌幅', () => {
   })
 })
 
-describe('券商层面的资金进出必须剔除', () => {
-  it('转出和月费不算亏损', () => {
-    const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-11', totalValue: 2_100 },
-      { date: '2026-08-13', totalValue: 2_000 }, // 少了 100，但全是你自己拿走的
-    ]
-    const points = buildFundSeries({
-      snapshots,
-      brokerAdjustments: [
-        { date: '2026-08-13', amount: -50, note: '转到 Checking' },
-        { date: '2026-08-13', amount: -50, note: 'Gold 月费' },
-      ],
-      fundCashFlows: seedFund('2026-08-11'),
-    })
-
-    // 真实涨跌为 0，展示值只被保底推动
-    expect(points[1].realNav).toBeCloseTo(1, 8)
-    expect(points[1].isFloored).toBe(true)
-  })
-
-  it('不剔除的话会被误算成大幅亏损', () => {
+describe('账户总资产的变动一律当成真实涨跌', () => {
+  it('总资产少了多少就算亏多少 —— 转账和月费要在 account.json 里手工扣掉', () => {
     const snapshots: AccountSnapshot[] = [
       { date: '2026-08-11', totalValue: 2_100 },
       { date: '2026-08-13', totalValue: 2_000 },
@@ -90,63 +71,23 @@ describe('券商层面的资金进出必须剔除', () => {
     expect(points[1].realNav).toBeCloseTo(2_000 / 2_100, 8)
   })
 
-  it('落在快照空档日的资金变动也会被归集', () => {
-    // 快照是隔日的，8-12 没有快照，那天的转账要算进 8-13 这一格
+  it('手工扣干净之后，账户走平就只剩保底在推', () => {
+    // 8-13 转出 50、月费 50，总资产写成扣掉这 100 之后的值
     const snapshots: AccountSnapshot[] = [
       { date: '2026-08-11', totalValue: 2_100 },
-      { date: '2026-08-13', totalValue: 2_000 },
+      { date: '2026-08-13', totalValue: 2_100 },
     ]
-    const points = buildFundSeries({
-      snapshots,
-      brokerAdjustments: [{ date: '2026-08-12', amount: -100 }],
-      fundCashFlows: seedFund('2026-08-11'),
-    })
+    const points = buildFundSeries({ snapshots, fundCashFlows: seedFund('2026-08-11') })
 
     expect(points[1].realNav).toBeCloseTo(1, 8)
+    expect(points[1].isFloored).toBe(true)
   })
 
-  it('失败又撤回的入金一进一出，两头都不留波动', () => {
-    // 150 在 8-04 到账、8-06 撤回，账户本身这几天纹丝不动
-    const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-02', totalValue: 2_000 },
-      { date: '2026-08-04', totalValue: 2_150 },
-      { date: '2026-08-06', totalValue: 2_000 },
-    ]
-    const points = buildFundSeries({
-      snapshots,
-      brokerAdjustments: [
-        { date: '2026-08-04', amount: 150 },
-        { date: '2026-08-06', amount: -150 },
-      ],
-      fundCashFlows: seedFund('2026-08-02'),
-    })
-
-    expect(points[1].realNav).toBeCloseTo(1, 8)
-    expect(points[2].realNav).toBeCloseTo(1, 8)
-  })
-
-  it('只补录一条腿会在另一头留下反向的假波动', () => {
-    const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-02', totalValue: 2_000 },
-      { date: '2026-08-04', totalValue: 2_150 },
-      { date: '2026-08-06', totalValue: 2_000 },
-    ]
-    const points = buildFundSeries({
-      snapshots,
-      brokerAdjustments: [{ date: '2026-08-04', amount: 150 }],
-      fundCashFlows: seedFund('2026-08-02'),
-    })
-
-    expect(points[1].realNav).toBeCloseTo(1, 8)
-    expect(points[2].realNav).toBeCloseTo(2_000 / 2_150, 8)
-  })
-
-  it('利息和分红属于真实收益，不该被剔除', () => {
+  it('利息和分红属于真实收益，如实算进涨幅', () => {
     const snapshots: AccountSnapshot[] = [
       { date: '2026-08-11', totalValue: 2_000 },
       { date: '2026-08-13', totalValue: 2_020 },
     ]
-    // brokerAdjustments 里不放 INTEREST，所以这 20 块如实算作收益
     const points = buildFundSeries({ snapshots, fundCashFlows: seedFund('2026-08-11') })
 
     expect(points[1].realNav).toBeCloseTo(1.01, 8)
@@ -154,14 +95,15 @@ describe('券商层面的资金进出必须剔除', () => {
 })
 
 describe('保底线', () => {
-  it('账户躺平不动时，整月按 0.3% 保底结算', () => {
+  it('账户躺平不动时，按天数 × 0.01% 保底结算', () => {
     const points = buildFundSeries({
       snapshots: ramp('2026-01-01', 31, 5_000, 0),
       fundCashFlows: seedFund('2026-01-01'),
     })
     const last = points[points.length - 1]
 
-    expect(last.displayNav).toBeCloseTo(1.003 ** (30 / 31), 8)
+    // 1-01 到 1-31，锚点在首日，走了 30 个自然日
+    expect(last.displayNav).toBeCloseTo(1.0001 ** 30, 8)
     expect(last.realNav).toBeCloseTo(1, 8)
     expect(last.isFloored).toBe(true)
   })
@@ -191,12 +133,12 @@ describe('保底线', () => {
     expect(last.displayNav).toBeLessThan(last.grossNav)
   })
 
-  it('起始月中途开户时，保底按当月剩余天数比例给', () => {
+  it('月中开户时保底只从开户那天起算，不补当月前半个月', () => {
     const points = buildFundSeries({
       snapshots: ramp('2026-01-16', 16, 5_000, 0),
       fundCashFlows: seedFund('2026-01-16'),
     })
-    expect(points[points.length - 1].displayNav).toBeCloseTo(1.003 ** (15 / 31), 8)
+    expect(points[points.length - 1].displayNav).toBeCloseTo(1.0001 ** 15, 8)
   })
 
   it('隔日快照下保底线仍按自然日推进', () => {
@@ -207,13 +149,13 @@ describe('保底线', () => {
     })
     const last = points[points.length - 1]
     expect(last.date).toBe('2026-07-31')
-    expect(last.displayNav).toBeCloseTo(1.003 ** (16 / 31), 8)
+    expect(last.displayNav).toBeCloseTo(1.0001 ** 16, 8)
   })
 })
 
 describe('超额分成', () => {
   it('跑赢保底的部分只兑现一半', () => {
-    // 1 月账户涨 10%，保底 0.3%，超额 9.7% 抽走一半
+    // 1 月账户涨 10%，保底 30 天约 0.30%，超额部分抽走一半
     const january = ramp('2026-01-01', 31, 5_000, 0)
     january.forEach((snapshot, i) => {
       snapshot.totalValue = 5_000 * 1.1 ** (i / 30)
@@ -224,7 +166,7 @@ describe('超额分成', () => {
     })
     const last = points[points.length - 1]
 
-    const floorRatio = 1.003 ** (30 / 31)
+    const floorRatio = 1.0001 ** 30
     expect(last.realNav).toBeCloseTo(1.1, 8)
     expect(last.displayNav).toBeCloseTo(floorRatio + 0.5 * (1.1 - floorRatio), 8)
   })
@@ -237,7 +179,7 @@ describe('超额分成', () => {
     const last = points[points.length - 1]
 
     expect(last.isFloored).toBe(true)
-    expect(last.displayNav).toBeCloseTo(1.003 ** (30 / 31), 8)
+    expect(last.displayNav).toBeCloseTo(1.0001 ** 30, 8)
     expect(last.feeAccrued).toBeCloseTo(0, 8)
   })
 
@@ -299,7 +241,7 @@ describe('超额分成', () => {
     // 2 月贴保底线走，1 月抽的成不退回，但也不再增加
     expect(februaryClose.isFloored).toBe(true)
     expect(februaryClose.feeAccrued).toBeCloseTo(januaryClose.feeAccrued, 8)
-    expect(februaryClose.displayNav).toBeCloseTo(januaryClose.displayNav * 1.003, 6)
+    expect(februaryClose.displayNav).toBeCloseTo(januaryClose.displayNav * 1.0001 ** 28, 6)
   })
 })
 
@@ -318,12 +260,12 @@ describe('跨月保底重置', () => {
     const januaryClose = points[30]
     const februaryClose = points[points.length - 1]
 
-    const januaryFloor = 1.003 ** (30 / 31)
+    const januaryFloor = 1.0001 ** 30
     const januaryNav = januaryFloor + 0.5 * (1.1 - januaryFloor)
     expect(januaryClose.displayNav).toBeCloseTo(januaryNav, 6)
     expect(januaryClose.isFloored).toBe(false)
     // 2 月锚点是 1 月抽成后的净值，保底叠加在它之上
-    expect(februaryClose.displayNav).toBeCloseTo(januaryNav * 1.003, 6)
+    expect(februaryClose.displayNav).toBeCloseTo(januaryNav * 1.0001 ** 28, 6)
     expect(februaryClose.isFloored).toBe(true)
   })
 
@@ -343,8 +285,9 @@ describe('跨月保底重置', () => {
 
     expect(januaryClose.isFloored).toBe(true)
     // 2 月真实涨 5%，扣掉保底后的超额抽一半。
-    // 锚点是 1 月 31 日，到 2 月 28 日走满整月，保底拿满 0.3%
-    const februaryRatio = 1.003 + 0.5 * (1.05 - 1.003)
+    // 锚点是 1 月 31 日，到 2 月 28 日走了 28 个自然日
+    const februaryFloor = 1.0001 ** 28
+    const februaryRatio = februaryFloor + 0.5 * (1.05 - februaryFloor)
     expect(februaryClose.displayNav).toBeCloseTo(
       januaryClose.displayNav * februaryRatio,
       6,
@@ -444,26 +387,61 @@ describe('基金流水', () => {
       { date: '2026-07-15', amount: 10_000 },
       { date: '2026-07-18', amount: 3_000 }, // 空档日，快照在 7-17 和 7-19
     ]
+    const points = buildFundSeries({ snapshots: sparse, fundCashFlows })
+    const records = describeCashFlows(points, fundCashFlows)
+
+    // 7-18 那笔按 7-19 的净值买入，收益率只从 7-19 起算
+    const latestNav = points[points.length - 1].displayNav
+    const boughtAt = points.find((point) => point.date === '2026-07-19')!.displayNav
+    expect(records[0].date).toBe('2026-07-18')
+    expect(records[0].returnRate).toBeCloseTo(latestNav / boughtAt - 1, 10)
+    expect(records[0].gain).toBeCloseTo(3_000 * (latestNav / boughtAt - 1), 8)
+  })
+
+  it('每笔的收益率各算各的，后进来的钱不冒领之前的涨幅', () => {
+    const rising = ramp('2026-01-01', 10, 5_000, 0.004)
+    const fundCashFlows: CashFlow[] = [
+      { date: '2026-01-01', amount: 1_000 },
+      { date: '2026-01-09', amount: 1_000 }, // 只跟了最后一段
+    ]
     const records = describeCashFlows(
-      buildFundSeries({ snapshots: sparse, fundCashFlows }),
+      buildFundSeries({ snapshots: rising, fundCashFlows }),
       fundCashFlows,
     )
 
-    expect(records[0].date).toBe('2026-07-18')
-    expect(records[0].units).toBeCloseTo(3_000 / records[0].nav, 8)
+    const [late, early] = records // 倒序，最新的在前
+    expect(late.returnRate!).toBeGreaterThan(0)
+    expect(late.returnRate!).toBeLessThan(early.returnRate!)
+    expect(late.gain!).toBeLessThan(early.gain!)
+  })
+
+  it('取钱没有「到今天赚了多少」，记 null', () => {
+    const fundCashFlows: CashFlow[] = [
+      { date: '2026-01-01', amount: 10_000 },
+      { date: '2026-01-05', amount: -4_000 },
+    ]
+    const records = describeCashFlows(
+      buildFundSeries({ snapshots, fundCashFlows }),
+      fundCashFlows,
+    )
+    const withdrawal = records.find((record) => record.amount < 0)!
+
+    expect(withdrawal.gain).toBeNull()
+    expect(withdrawal.returnRate).toBeNull()
   })
 })
 
-describe('托管账户涨跌幅（不剔资金）', () => {
-  it('以第一个快照为基准，直接比总资产', () => {
+describe('托管账户涨跌幅（不剔资金，固定本金为基数）', () => {
+  it('基数是起始资金，不是第一个快照', () => {
     const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-12', totalValue: 2_000 },
-      { date: '2026-08-14', totalValue: 2_100 },
+      { date: '2026-08-12', totalValue: 2_100 },
+      { date: '2026-08-14', totalValue: 2_200 },
     ]
-    const points = buildAccountReturnSeries(snapshots)
+    const points = buildAccountReturnSeries(snapshots, 2_000)
 
-    expect(points[0].returnRate).toBe(0)
-    expect(points[1].returnRate).toBeCloseTo(0.05, 10)
+    // 第一个点就已经赚了 5%，不会被归零
+    expect(points[0].returnRate).toBeCloseTo(0.05, 10)
+    expect(points[1].returnRate).toBeCloseTo(0.1, 10)
   })
 
   it('入金也算进涨跌幅，这条线本来就不剔资金', () => {
@@ -471,7 +449,7 @@ describe('托管账户涨跌幅（不剔资金）', () => {
       { date: '2026-08-12', totalValue: 2_000 },
       { date: '2026-08-14', totalValue: 2_500 }, // 全是入金，一分没赚
     ]
-    const points = buildAccountReturnSeries(snapshots)
+    const points = buildAccountReturnSeries(snapshots, 2_000)
 
     expect(points[1].returnRate).toBeCloseTo(0.25, 10)
   })
@@ -482,7 +460,7 @@ describe('托管账户涨跌幅（不剔资金）', () => {
       { date: '2026-08-12', totalValue: 2_100 },
       { date: '2026-08-14', totalValue: 2_200 },
     ]
-    const points = buildAccountReturnSeries(snapshots)
+    const points = buildAccountReturnSeries(snapshots, 2_000)
 
     expect(points.map((point) => point.date)).toEqual([
       '2026-08-10',
@@ -491,48 +469,18 @@ describe('托管账户涨跌幅（不剔资金）', () => {
     ])
   })
 
-  it('快照乱序进来也按日期升序输出，基准取最早那天', () => {
+  it('快照乱序进来也按日期升序输出', () => {
     const shuffled: AccountSnapshot[] = [
       { date: '2026-08-14', totalValue: 2_200 },
       { date: '2026-08-10', totalValue: 2_000 },
     ]
-    const points = buildAccountReturnSeries(shuffled)
+    const points = buildAccountReturnSeries(shuffled, 2_000)
 
     expect(points.map((point) => point.date)).toEqual(['2026-08-10', '2026-08-14'])
     expect(points[1].returnRate).toBeCloseTo(0.1, 10)
   })
 
   it('没有快照就没有曲线', () => {
-    expect(buildAccountReturnSeries([])).toEqual([])
-  })
-})
-
-describe('手写资金流净化毛毛的曲线', () => {
-  it('入金当天的增量被剔掉，净值不动', () => {
-    const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-12', totalValue: 2_000 },
-      { date: '2026-08-14', totalValue: 2_500 }, // 全是入金，一分没赚
-    ]
-    const points = buildFundSeries({
-      snapshots,
-      brokerAdjustments: [{ date: '2026-08-14', amount: 500 }],
-    })
-
-    expect(points[1].realNav).toBeCloseTo(1, 10)
-  })
-
-  it('只修当天，之后的日子不受影响', () => {
-    const snapshots: AccountSnapshot[] = [
-      { date: '2026-08-12', totalValue: 2_000 },
-      { date: '2026-08-14', totalValue: 2_500 }, // 入金 500
-      { date: '2026-08-16', totalValue: 2_625 }, // 真涨 5%
-    ]
-    const points = buildFundSeries({
-      snapshots,
-      brokerAdjustments: [{ date: '2026-08-14', amount: 500 }],
-    })
-
-    expect(points[1].realNav).toBeCloseTo(1, 10)
-    expect(points[2].realNav).toBeCloseTo(1.05, 10)
+    expect(buildAccountReturnSeries([], 2_000)).toEqual([])
   })
 })

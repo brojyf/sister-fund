@@ -1,17 +1,6 @@
 import accountData from '../data/account.json'
-import adjustmentData from '../data/adjustment.json'
 import cashFlowData from '../data/cash-flows.json'
 import { type AccountSnapshot, type CashFlow } from './fund'
-
-/**
- * 账户层面的资金进出，手写在 src/data/adjustment.json，用来净化毛毛那条曲线。
- *
- * 只能手写：sync 不拉 SnapTrade 的活动列表，而且失败又撤回的转账在活动列表里
- * 一条都不留。JSON 里字段叫 notes，这里对齐到 CashFlow 的 note。
- */
-export const brokerAdjustments: CashFlow[] = adjustmentData.adjustments.map(
-  ({ date, amount, notes }) => ({ date, amount, note: notes }),
-)
 
 /** 毛毛基金的加钱/取钱，手写在 src/data/cash-flows.json */
 export const fundCashFlows: CashFlow[] = cashFlowData.flows
@@ -46,7 +35,13 @@ function padToFirstDeposit(
   return [...padded, ...snapshots]
 }
 
-/** SnapTrade 返回的原始账户总资产，未做任何补齐，用于账户走势图 */
+/**
+ * 托管账户的起始资金，美元。托管账户走势图的百分比就是拿总资产除以它。
+ * 账户从三笔 ACH 入金开张：$10 + $1,490 + $500。
+ */
+export const ACCOUNT_BASE_CAPITAL = 2_000
+
+/** account.json 里的账户总资产，未做任何补齐，用于托管账户走势图 */
 export const rawSnapshots: AccountSnapshot[] = accountData.snapshots
 
 /** 喂给净值计算的快照：起点对齐到毛毛第一次给钱那天 */

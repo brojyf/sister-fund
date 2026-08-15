@@ -4,11 +4,11 @@ import {
   buildFundSeries,
   describeCashFlows,
   summarize,
-  MONTHLY_FLOOR_RATE,
+  DAILY_FLOOR_RATE,
   PERFORMANCE_FEE_RATE,
   type AccountReturnPoint,
 } from './lib/fund'
-import { brokerAdjustments, fundCashFlows, rawSnapshots, snapshots } from './lib/fundData'
+import { ACCOUNT_BASE_CAPITAL, fundCashFlows, rawSnapshots, snapshots } from './lib/fundData'
 import { formatChineseDate, money, percent, signedMoney } from './lib/format'
 import { AccountChart } from './components/AccountChart'
 import { EquityChart, type EquityPoint } from './components/EquityChart'
@@ -16,15 +16,18 @@ import './App.css'
 
 export default function App() {
   const { equityPoints, accountPoints, summary, latestDate, cashFlowRecords } = useMemo(() => {
-    const points = buildFundSeries({ snapshots, brokerAdjustments, fundCashFlows })
+    const points = buildFundSeries({ snapshots, fundCashFlows })
     const equityPoints: EquityPoint[] = points.map((point) => ({
       date: point.date,
       equity: point.equity,
       floorEquity: point.units * point.floorNav,
     }))
-    // 账户曲线画的是账户总资产比开张那天的涨跌幅，不剔资金进出 ——
+    // 账户曲线画的是总资产比起始资金的涨跌幅，不剔资金进出 ——
     // 只吃 account.json，永远画到最新一个快照日
-    const accountPoints: AccountReturnPoint[] = buildAccountReturnSeries(rawSnapshots)
+    const accountPoints: AccountReturnPoint[] = buildAccountReturnSeries(
+      rawSnapshots,
+      ACCOUNT_BASE_CAPITAL,
+    )
     return {
       equityPoints,
       accountPoints,
@@ -84,7 +87,7 @@ export default function App() {
         </div>
         <ul className="legend">
           <li>
-            <span className="swatch swatch--account" /> 累计涨跌幅
+            <span className="swatch swatch--account" /> 相对本金 ${ACCOUNT_BASE_CAPITAL.toLocaleString('en-US')} 的涨跌幅
           </li>
         </ul>
       </section>
@@ -96,8 +99,8 @@ export default function App() {
             <tr>
               <th scope="col">日期</th>
               <th scope="col">金额</th>
-              <th scope="col">当日净值</th>
-              <th scope="col">份额</th>
+              <th scope="col">赚了</th>
+              <th scope="col">收益率</th>
             </tr>
           </thead>
           <tbody>
@@ -108,11 +111,8 @@ export default function App() {
                   {record.amount > 0 ? '加钱 ' : '取钱 '}
                   {signedMoney.format(record.amount)}
                 </td>
-                <td>{record.nav.toFixed(4)}</td>
-                <td>
-                  {record.units > 0 ? '+' : ''}
-                  {record.units.toFixed(2)}
-                </td>
+                <td>{record.gain === null ? '—' : signedMoney.format(record.gain)}</td>
+                <td>{record.returnRate === null ? '—' : percent.format(record.returnRate)}</td>
               </tr>
             ))}
           </tbody>
@@ -123,9 +123,10 @@ export default function App() {
         <h2 className="rules__title">规则</h2>
         <ul className="rules__list">
           <li>
-            <strong>每月保底 {(MONTHLY_FLOOR_RATE * 100).toFixed(1)}%</strong>
-            ——当月跑输保底，差额由管理人补足，你的资产不会跌破保底线。
-            {summary.isFloored && <em> 这个月正在走保底。</em>}
+            <strong>每天保底 {(DAILY_FLOOR_RATE * 100).toFixed(2)}%</strong>
+            ——按自然日累加，一个月约 {(((1 + DAILY_FLOOR_RATE) ** 30 - 1) * 100).toFixed(2)}%。
+            跑输的差额由管理人补足，你的资产不会跌破保底线。
+            {summary.isFloored && <em> 现在正在走保底。</em>}
           </li>
           <li>
             <strong>超额分成 {(PERFORMANCE_FEE_RATE * 100).toFixed(0)}%</strong>
