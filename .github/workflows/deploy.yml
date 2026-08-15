@@ -28,8 +28,9 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # SnapTrade 的历史总资产最多回溯 1 年且是隔日粒度，每天抓一次沉淀进仓库，
-      # 才能攒出日粒度曲线。抓不到就让整个 run 失败，不要静默部署旧数据。
+      # SnapTrade 没有能用的历史端点（见 README「为什么不用 balanceHistory」），
+      # 曲线只能靠每天抓一次实时余额沉淀进仓库。23:00 UTC = 美东 19:00，收盘后、
+      # 当天没翻页，抓到的就是当天收盘值。抓不到就让整个 run 失败，不要静默部署旧数据。
       - name: 同步账户快照
         run: npm run snaptrade:sync
         env:
