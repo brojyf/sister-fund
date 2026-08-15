@@ -60,7 +60,7 @@ export default function App() {
           <span className="delta__divider" aria-hidden="true" />
           <span className="delta">累计赚 {signedMoney.format(summary.totalGain)}</span>
           <span className="delta__divider" aria-hidden="true" />
-          <span className="delta">{percent.format(summary.navReturnRate)}</span>
+          <span className="delta">{percent.format(summary.totalReturnRate)}</span>
         </p>
       </section>
 

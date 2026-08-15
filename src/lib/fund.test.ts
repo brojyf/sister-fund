@@ -104,6 +104,42 @@ describe('券商层面的资金进出必须剔除', () => {
     expect(points[1].realNav).toBeCloseTo(1, 8)
   })
 
+  it('失败又撤回的入金一进一出，两头都不留波动', () => {
+    // 150 在 8-04 到账、8-06 撤回，账户本身这几天纹丝不动
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-02', totalValue: 2_000 },
+      { date: '2026-08-04', totalValue: 2_150 },
+      { date: '2026-08-06', totalValue: 2_000 },
+    ]
+    const points = buildFundSeries({
+      snapshots,
+      brokerAdjustments: [
+        { date: '2026-08-04', amount: 150 },
+        { date: '2026-08-06', amount: -150 },
+      ],
+      fundCashFlows: seedFund('2026-08-02'),
+    })
+
+    expect(points[1].realNav).toBeCloseTo(1, 8)
+    expect(points[2].realNav).toBeCloseTo(1, 8)
+  })
+
+  it('只补录一条腿会在另一头留下反向的假波动', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-02', totalValue: 2_000 },
+      { date: '2026-08-04', totalValue: 2_150 },
+      { date: '2026-08-06', totalValue: 2_000 },
+    ]
+    const points = buildFundSeries({
+      snapshots,
+      brokerAdjustments: [{ date: '2026-08-04', amount: 150 }],
+      fundCashFlows: seedFund('2026-08-02'),
+    })
+
+    expect(points[1].realNav).toBeCloseTo(1, 8)
+    expect(points[2].realNav).toBeCloseTo(2_000 / 2_150, 8)
+  })
+
   it('利息和分红属于真实收益，不该被剔除', () => {
     const snapshots: AccountSnapshot[] = [
       { date: '2026-08-11', totalValue: 2_000 },
@@ -375,6 +411,19 @@ describe('基金流水', () => {
     // 当期只有原来那 1000 在涨，收益应该是个位数，不是 9 万
     expect(summary.dayGain).toBeLessThan(100)
     expect(summary.dayGain).toBeGreaterThan(0)
+  })
+
+  it('累计收益率和累计赚的钱必须对得上，不能用净值涨幅冒充', () => {
+    // 1000 跟满全程，9000 最后一天才进来：净值涨幅远高于她这笔钱的实际收益率
+    const fundCashFlows: CashFlow[] = [
+      { date: '2026-01-01', amount: 1_000 },
+      { date: '2026-01-10', amount: 9_000 },
+    ]
+    const points = buildFundSeries({ snapshots, fundCashFlows })
+    const summary = summarize(points, fundCashFlows)!
+
+    expect(summary.totalReturnRate).toBeCloseTo(summary.totalGain / summary.principal, 10)
+    expect(summary.totalReturnRate).toBeLessThan(points[9].displayNav - 1)
   })
 
   it('本金只统计基金流水，与账户规模无关', () => {

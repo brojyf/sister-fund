@@ -235,10 +235,12 @@ export interface FundSummary {
   /** 累计净投入的本金 */
   principal: number
   totalGain: number
-  /** 她这笔钱实际赚了多少的比例（受加钱时点影响） */
+  /**
+   * 累计赚的钱占本金的比例，与 totalGain 是同一件事的两种写法。
+   * 不能用净值涨幅代替：净值是从第一天起算的，而后面加进来的钱只跟了一小段，
+   * 拿 4.11% 去配 +¥41.15 的本金 1 万，会让人以为赚了 411 块。
+   */
   totalReturnRate: number
-  /** 基金本身的累计收益率，与曲线一致，不受加钱时点影响 */
-  navReturnRate: number
   /** 当期收益，只算已有的钱涨了多少，不含新加进来的钱 */
   dayGain: number
   isFloored: boolean
@@ -263,7 +265,6 @@ export function summarize(
     principal,
     totalGain: latest.equity - principal,
     totalReturnRate: principal > 0 ? latest.equity / principal - 1 : 0,
-    navReturnRate: latest.displayNav - 1,
     // 用上一期的份额乘净值涨幅，这样当期新加的钱不会被算成收益
     dayGain: previous ? previous.units * (latest.displayNav - previous.displayNav) : 0,
     isFloored: latest.isFloored,
