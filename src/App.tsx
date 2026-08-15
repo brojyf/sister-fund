@@ -23,10 +23,11 @@ export default function App() {
       floorEquity: point.units * point.floorNav,
     }))
     // 账户曲线画的是总资产比起始资金的涨跌幅，不剔资金进出 ——
-    // 只吃 account.json，永远画到最新一个快照日
+    // 只吃 account.json，永远画到最新一个快照日；流水只是标在线上的点
     const accountPoints: AccountReturnPoint[] = buildAccountReturnSeries(
       rawSnapshots,
       ACCOUNT_BASE_CAPITAL,
+      fundCashFlows,
     )
     return {
       equityPoints,
@@ -85,6 +86,14 @@ export default function App() {
         <div className="panel__chart">
           <AccountChart points={accountPoints} />
         </div>
+        <ul className="legend">
+          <li>
+            <span className="swatch swatch--flow-in" /> 买入
+          </li>
+          <li>
+            <span className="swatch swatch--flow-out" /> 卖出
+          </li>
+        </ul>
       </section>
 
       <section className="flows" aria-label="资金流水">

@@ -30,6 +30,11 @@ export interface AccountReturnPoint {
   /** YYYY-MM-DD */
   date: string
   returnRate: number
+  /**
+   * 当天归到这个点上的基金流水合计（人民币，正数进负数出），没有就是 0。
+   * 只是画在曲线上的标记，不参与涨跌幅计算 —— 这条线本来就不剔资金进出。
+   */
+  cashFlow: number
 }
 
 /**
@@ -42,15 +47,31 @@ export interface AccountReturnPoint {
  * 这条线回答的是「账户里的钱比投进去的本金多了多少」，是账户的绝对水位；
  * 毛毛那条（buildFundSeries 的 displayNav）是逐日复利链，还叠了保底和抽成。
  * 两条线口径不同是刻意的。
+ *
+ * fundCashFlows 只用来在曲线上标出毛毛哪天加钱/取钱，不参与任何计算。
+ * 流水日期不在快照日上时，归到之后第一个有快照的那天（同 describeCashFlows）；
+ * 落在最后一个快照之后的流水没有点可挂，直接丢掉。
  */
 export function buildAccountReturnSeries(
   snapshots: AccountSnapshot[],
   baseCapital: number,
+  fundCashFlows: CashFlow[] = [],
 ): AccountReturnPoint[] {
   if (!(baseCapital > 0)) return []
-  return [...snapshots]
+  const points = [...snapshots]
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map(({ date, totalValue }) => ({ date, returnRate: totalValue / baseCapital - 1 }))
+    .map(({ date, totalValue }) => ({
+      date,
+      returnRate: totalValue / baseCapital - 1,
+      cashFlow: 0,
+    }))
+
+  for (const flow of fundCashFlows) {
+    const point = points.find((candidate) => candidate.date >= flow.date)
+    if (point) point.cashFlow += flow.amount
+  }
+
+  return points
 }
 
 /** 一笔资金变动。正数进，负数出 */

@@ -483,4 +483,32 @@ describe('托管账户涨跌幅（不剔资金，固定本金为基数）', () =
   it('没有快照就没有曲线', () => {
     expect(buildAccountReturnSeries([], 2_000)).toEqual([])
   })
+
+  it('流水标在快照日上，落在空档日的归到之后第一个快照', () => {
+    const snapshots: AccountSnapshot[] = [
+      { date: '2026-08-10', totalValue: 2_000 },
+      { date: '2026-08-12', totalValue: 2_100 },
+      { date: '2026-08-14', totalValue: 2_200 },
+    ]
+    const flows: CashFlow[] = [
+      { date: '2026-08-10', amount: 1_000 },
+      { date: '2026-08-11', amount: 500 }, // 没有快照，归到 8/12
+      { date: '2026-08-12', amount: -200 },
+    ]
+    const points = buildAccountReturnSeries(snapshots, 2_000, flows)
+
+    expect(points.map((point) => point.cashFlow)).toEqual([1_000, 300, 0])
+    // 标记不影响涨跌幅
+    expect(points[2].returnRate).toBeCloseTo(0.1, 10)
+  })
+
+  it('最后一个快照之后的流水没有点可挂，直接丢掉', () => {
+    const snapshots: AccountSnapshot[] = [{ date: '2026-08-10', totalValue: 2_000 }]
+    const points = buildAccountReturnSeries(snapshots, 2_000, [
+      { date: '2026-08-11', amount: 1_000 },
+    ])
+
+    expect(points).toHaveLength(1)
+    expect(points[0].cashFlow).toBe(0)
+  })
 })

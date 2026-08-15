@@ -14,11 +14,39 @@ import {
   formatChineseDate,
   formatMonthDay,
   percent,
+  signedMoney,
   tightDomain,
 } from '../lib/format'
 
 interface Props {
   points: AccountReturnPoint[]
+}
+
+const FLOW_IN_COLOR = '#4a6b4f'
+const FLOW_OUT_COLOR = '#a5442f'
+
+interface FlowDotProps {
+  cx?: number
+  cy?: number
+  payload?: AccountReturnPoint
+}
+
+/**
+ * 有流水的那天在曲线上点一个实心圆：买入绿、卖出红。
+ * 用 Area 的 dot 回调而不是 ReferenceDot，位置直接跟着曲线的比例尺走。
+ */
+function FlowDot({ cx, cy, payload }: FlowDotProps) {
+  if (cx === undefined || cy === undefined || !payload?.cashFlow) return <g />
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={4}
+      fill={payload.cashFlow > 0 ? FLOW_IN_COLOR : FLOW_OUT_COLOR}
+      stroke="#f7f2e8"
+      strokeWidth={1.5}
+    />
+  )
 }
 
 /** 托管账户的累计收益率走势 */
@@ -60,6 +88,11 @@ export function AccountChart({ points }: Props) {
               <div className="tip">
                 <p className="tip__date">{formatChineseDate(String(label))}</p>
                 <p className="tip__amount">{percent.format(point.returnRate)}</p>
+                {point.cashFlow !== 0 && (
+                  <p className={point.cashFlow > 0 ? 'tip__flow--in' : 'tip__flow--out'}>
+                    {point.cashFlow > 0 ? '买入' : '卖出'} {signedMoney.format(point.cashFlow)}
+                  </p>
+                )}
               </div>
             )
           }}
@@ -70,7 +103,7 @@ export function AccountChart({ points }: Props) {
           stroke="#6b6055"
           strokeWidth={1.75}
           fill="url(#accountFill)"
-          dot={false}
+          dot={<FlowDot />}
           isAnimationActive={false}
         />
       </ComposedChart>
