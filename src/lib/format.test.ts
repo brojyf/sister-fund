@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { axisTicks, tightDomain } from './format'
+import { axisTicks, formatShortDate, tightDomain } from './format'
+
+describe('流水日期', () => {
+  it('压成 yy/mm/dd，月日保留前导零', () => {
+    expect(formatShortDate('2026-06-26')).toBe('26/06/26')
+    expect(formatShortDate('2026-08-13')).toBe('26/08/13')
+  })
+})
 
 describe('纵轴范围', () => {
   it('只包住数据，不从 0 起', () => {

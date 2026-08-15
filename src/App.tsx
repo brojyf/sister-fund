@@ -9,7 +9,7 @@ import {
   type AccountReturnPoint,
 } from './lib/fund'
 import { ACCOUNT_BASE_CAPITAL, fundCashFlows, rawSnapshots, snapshots } from './lib/fundData'
-import { formatChineseDate, money, percent, signedMoney } from './lib/format'
+import { formatChineseDate, formatShortDate, money, percent, signedMoney } from './lib/format'
 import { AccountChart } from './components/AccountChart'
 import { EquityChart, type EquityPoint } from './components/EquityChart'
 import './App.css'
@@ -85,11 +85,6 @@ export default function App() {
         <div className="panel__chart">
           <AccountChart points={accountPoints} />
         </div>
-        <ul className="legend">
-          <li>
-            <span className="swatch swatch--account" /> 相对本金 ${ACCOUNT_BASE_CAPITAL.toLocaleString('en-US')} 的涨跌幅
-          </li>
-        </ul>
       </section>
 
       <section className="flows" aria-label="资金流水">
@@ -106,9 +101,8 @@ export default function App() {
           <tbody>
             {cashFlowRecords.map((record) => (
               <tr key={record.date}>
-                <td>{formatChineseDate(record.date)}</td>
+                <td>{formatShortDate(record.date)}</td>
                 <td className={record.amount > 0 ? 'flows__in' : 'flows__out'}>
-                  {record.amount > 0 ? '加钱 ' : '取钱 '}
                   {signedMoney.format(record.amount)}
                 </td>
                 <td>{record.gain === null ? '—' : signedMoney.format(record.gain)}</td>
@@ -122,27 +116,32 @@ export default function App() {
       <section className="rules" aria-label="规则">
         <h2 className="rules__title">规则</h2>
         <ul className="rules__list">
+          {/* 正文一律写成一整行：JSX 里换行会被拼成半角空格，落在中文句中很难看 */}
           <li>
             <strong>每天保底 {(DAILY_FLOOR_RATE * 100).toFixed(2)}%</strong>
-            ——按自然日累加，一个月约 {(((1 + DAILY_FLOOR_RATE) ** 30 - 1) * 100).toFixed(2)}%。
-            跑输的差额由管理人补足，你的资产不会跌破保底线。
+            <span className="rules__dash">——</span>
+            {`按自然日累加，一个月约 ${(((1 + DAILY_FLOOR_RATE) ** 30 - 1) * 100).toFixed(2)}%。跑输的差额由管理人补足，你的资产不会跌破保底线。`}
             {summary.isFloored && <em> 现在正在走保底。</em>}
           </li>
           <li>
             <strong>超额分成 {(PERFORMANCE_FEE_RATE * 100).toFixed(0)}%</strong>
-            ——超过保底的部分，管理人分走一半，其余全部归你。
+            <span className="rules__dash">——</span>
+            超过保底的部分，管理人分走一半，其余全部归你。
           </li>
           <li>
             <strong>按自然月结算</strong>
-            ——每个月初重新起算。上个月已经到手的收益，不会被这个月的回撤吃掉。
+            <span className="rules__dash">——</span>
+            每个月初重新起算。上个月已经到手的收益，不会被这个月的回撤吃掉。
           </li>
           <li>
             <strong>加钱按当天净值折算份额</strong>
-            ——加进来的钱只增加本金，不会凭空多出收益，也不会拉低你已有的收益率。
+            <span className="rules__dash">——</span>
+            加进来的钱只增加本金，不会凭空多出收益，也不会拉低你已有的收益率。
           </li>
           <li>
             <strong>每天自动更新</strong>
-            ——净值跟随托管账户每日同步，人民币计价。
+            <span className="rules__dash">——</span>
+            净值跟随托管账户每日同步，人民币计价。
           </li>
         </ul>
       </section>

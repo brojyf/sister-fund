@@ -25,6 +25,11 @@ export function formatChineseDate(date: string): string {
   return `${year} 年 ${month} 月 ${day} 日`
 }
 
+/** 流水表用，窄屏一行要塞下四列，日期只留 yy/mm/dd */
+export function formatShortDate(date: string): string {
+  return date.slice(2).replaceAll('-', '/')
+}
+
 export function formatMonthDay(date: string): string {
   const [, month, day] = date.split('-').map(Number)
   return `${month}/${day}`

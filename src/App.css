@@ -164,7 +164,6 @@
 }
 .swatch--equity { border-top: 2px solid var(--accent); }
 .swatch--floor { border-top: 1.5px dashed var(--ink-faint); }
-.swatch--account { border-top: 2px solid var(--ink-soft); }
 
 .tip {
   padding: 0.65rem 0.9rem;
@@ -211,19 +210,30 @@
   color: var(--ink);
 }
 
+/* 不限宽：卡一个阅读行长会在右边留出一大片空白，和左边 1.5rem 的悬挂缩进凑成
+   左右不对称。正文跟图表、流水表一样铺满 sheet，页面两侧留白由 .sheet 统一给 */
 .rules__list {
   margin: 0;
   padding: 0;
   list-style: none;
-  max-width: 52ch;
 }
 
 .rules__list li {
   position: relative;
-  padding: 0 0 0 1.5rem;
+  /* 右边和左边的悬挂缩进一样宽，正文左右等距，短横挂在左侧空槽里 */
+  padding: 0 1.5rem;
   font-size: 0.9rem;
   line-height: 1.85;
   color: var(--ink-soft);
+  /* 中文按字断行，右边缘天然参差。两端对齐让浏览器拉字间距补平：
+     CJK 下 text-justify 的默认 auto 就是 inter-ideograph 那套规则，
+     不用写已废弃的 text-justify（Chrome 只在实验开关后面支持）。
+     末行仍是左对齐，因为 text-align-last 默认 auto */
+  text-align: justify;
+  /* Safari 让行尾的逗号句号悬挂到边界外，右边更齐；Chrome/Firefox 忽略，无副作用 */
+  hanging-punctuation: allow-end;
+  /* 末行不留孤字；不支持的浏览器退回普通折行 */
+  text-wrap: pretty;
 }
 
 .rules__list li + li {
@@ -248,6 +258,11 @@
 .rules__list em {
   font-style: normal;
   color: var(--accent);
+}
+
+/* 浏览器把 U+2014 当作可断点，不锁住的话「——」会被拆成两行各一根 */
+.rules__dash {
+  white-space: nowrap;
 }
 
 /* ── 资金流水 ───────────────────────────── */
@@ -307,12 +322,17 @@
     gap: 0.7rem;
     font-size: 0.85rem;
   }
-  /* 手机上只留毛毛关心的两列，净值和份额是给你自己对账用的 */
-  .flows__table th:nth-child(n + 3),
-  .flows__table td:nth-child(n + 3) {
-    display: none;
+  /* 手机上四列都要留，靠缩字号和收紧留白挤，别再折行 */
+  .flows__table th {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
   }
-  .flows__table td:first-child {
+  .flows__table td,
+  .flows__table td:not(:first-child) {
+    font-size: 0.72rem;
+  }
+  .flows__table td {
+    padding: 0.75rem 0;
     white-space: nowrap;
   }
 }
