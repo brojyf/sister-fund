@@ -10,8 +10,9 @@
  * 没有的资金进出（失败又撤回的转账就是这样）手写在
  * src/data/broker-adjustments.json，脚本同样不碰那个文件。
  */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { snaptrade } from './snaptrade-client.mjs'
+import { mergeSnapshots } from './snapshot-history.mjs'
 import {
   ACCOUNT_ID,
   INCEPTION,
@@ -24,27 +25,29 @@ const OUTPUT = new URL('../src/data/account.json', import.meta.url)
 const today = new Date().toISOString().slice(0, 10)
 
 // ── 历史总资产 ─────────────────────────────────────────────
+const recorded = existsSync(OUTPUT)
+  ? (JSON.parse(readFileSync(OUTPUT, 'utf8')).snapshots ?? [])
+  : []
+
 const { data: history } = await snaptrade.accountInformation.getAccountBalanceHistory({
   accountId: ACCOUNT_ID,
 })
 const rawPoints = Array.isArray(history) ? history : (history?.history ?? [])
 
-const snapshots = rawPoints
+const estimated = rawPoints
   .map((point) => ({ date: point.date, totalValue: Number(point.total_value) }))
   .filter((point) => point.date >= INCEPTION && Number.isFinite(point.totalValue))
-  .sort((a, b) => a.date.localeCompare(b.date))
-
-if (snapshots.length === 0) {
-  throw new Error(`${INCEPTION} 之后没有任何账户快照，检查 ACCOUNT_ID 和 INCEPTION`)
-}
 
 // 历史端点只到昨天，补一个今天的实时余额，让曲线走到当天
 const { data: accounts } = await snaptrade.accountInformation.listUserAccounts({})
 const account = accounts.find((candidate) => candidate.id === ACCOUNT_ID)
 const liveValue = Number(account?.balance?.total?.amount)
+const live = Number.isFinite(liveValue) ? { date: today, totalValue: liveValue } : null
 
-if (Number.isFinite(liveValue) && snapshots[snapshots.length - 1].date < today) {
-  snapshots.push({ date: today, totalValue: liveValue })
+const snapshots = mergeSnapshots(recorded, estimated, live)
+
+if (snapshots.length === 0) {
+  throw new Error(`${INCEPTION} 之后没有任何账户快照，检查 ACCOUNT_ID 和 INCEPTION`)
 }
 
 // ── 资金变动 ───────────────────────────────────────────────
@@ -83,7 +86,10 @@ writeFileSync(
   `${JSON.stringify({ syncedAt: today, accountId: ACCOUNT_ID, snapshots, brokerAdjustments }, null, 2)}\n`,
 )
 
-console.log(`账户快照 ${snapshots.length} 个：${snapshots[0].date} → ${snapshots[snapshots.length - 1].date}`)
+console.log(
+  `账户快照 ${snapshots.length} 个（本次新增 ${snapshots.length - recorded.length}）：` +
+    `${snapshots[0].date} → ${snapshots[snapshots.length - 1].date}`,
+)
 console.log(`剔除的资金变动 ${brokerAdjustments.length} 笔，合计 ${brokerAdjustments.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}`)
 for (const item of brokerAdjustments) {
   console.log(`  ${item.date}  ${String(item.amount).padStart(9)}  ${item.note.slice(0, 52)}`)
