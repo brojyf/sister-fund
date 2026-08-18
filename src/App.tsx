@@ -147,6 +147,11 @@ export default function App() {
             <span className="rules__dash">——</span>
             净值跟随托管账户每日同步，人民币计价。
           </li>
+          <li>
+            <strong>收益次日早上 7 点刷新</strong>
+            <span className="rules__dash">——</span>
+            美股每个交易日的收益，在北京时间第二天早上 7 点更新到页面上；美股休市（周末和节假日）期间不更新。
+          </li>
         </ul>
       </section>
 
