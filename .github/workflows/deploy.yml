@@ -1,6 +1,6 @@
 name: deploy
 
-# 代码改动即部署；每天 23:00 UTC（美股收盘后）拉一次账户数据再部署。
+# 代码改动即部署（不拉数据）；每天 23:00 UTC（美股收盘后）拉一次账户数据再部署。
 # 这是唯一的部署入口，本地不跑 wrangler deploy —— 手动发版用 workflow_dispatch。
 on:
   push:
@@ -32,6 +32,7 @@ jobs:
       # 曲线只能靠每天抓一次实时余额沉淀进仓库。23:00 UTC = 美东 19:00，收盘后、
       # 当天没翻页，抓到的就是当天收盘值。抓不到就让整个 run 失败，不要静默部署旧数据。
       - name: 同步账户快照
+        if: github.event_name == 'schedule'
         run: npm run snaptrade:sync
         env:
           SNAPTRADE_CLIENT_ID: ${{ secrets.SNAPTRADE_CLIENT_ID }}
@@ -48,6 +49,7 @@ jobs:
       # 部署成功之后才回写，保证仓库里的 account.json 永远等于线上那份。
       # 用 GITHUB_TOKEN push 不会再触发本 workflow，不会循环。
       - name: 回写 account.json
+        if: github.event_name == 'schedule'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

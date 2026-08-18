@@ -78,9 +78,11 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 
 ## 部署
 
-`.github/workflows/deploy.yml` 是唯一部署入口：push 到 `main` 或每天 23:00 UTC
-触发，顺序是 sync → test → build → `wrangler deploy` → 把 `account.json`
-commit 回 `main`。本地不要跑 `wrangler deploy`。定时 run 会自动产生
+`.github/workflows/deploy.yml` 是唯一部署入口：push 到 `main`、每天 23:00 UTC
+或手动 `workflow_dispatch` 触发。**只有定时 run 会拉数据**：sync → test → build →
+`wrangler deploy` → 把 `account.json` commit 回 `main`；push 和手动触发跳过
+sync 与回写，只走 test → build → `wrangler deploy`，部署的是仓库里已有的
+`account.json`。本地不要跑 `wrangler deploy`。定时 run 会自动产生
 `chore: 同步账户快照 …` 提交，`git pull` 之后再动 `account.json`。
 
 `.env.local`（gitignored）只有 `SNAPTRADE_CLIENT_ID` / `SNAPTRADE_CONSUMER_KEY`，
