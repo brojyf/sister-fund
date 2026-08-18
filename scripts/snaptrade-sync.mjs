@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { snaptrade } from './snaptrade-client.mjs'
 import { mergeSnapshots } from './snapshot-history.mjs'
-import { isWeekend, newYorkDate } from './trading-day.mjs'
+import { coveredYears, isMarketClosed, newYorkDate } from './trading-day.mjs'
 import { ACCOUNT_ID } from './config.mjs'
 
 const OUTPUT = new URL('../src/data/account.json', import.meta.url)
@@ -21,10 +21,15 @@ const OUTPUT = new URL('../src/data/account.json', import.meta.url)
 // 账户在美国，快照按美东日历日归档 —— 用 UTC 日期会把收盘后的余额记到第二天
 const today = newYorkDate()
 
-// 周末休市，余额跟周五收盘一模一样，写进去只是重复点。直接退出，连 API 都不用调。
-if (isWeekend(today)) {
-  console.log(`${today}（美东）是周末，休市不记快照`)
+// 休市日余额跟上一个交易日一模一样，写进去只是重复点。直接退出，连 API 都不用调。
+if (isMarketClosed(today)) {
+  console.log(`${today}（美东）休市，不记快照`)
   process.exit(0)
+}
+
+// 假日表是硬编码的，过期了只会漏判（假日那天写一个重复点），这里喊一声
+if (!coveredYears.has(today.slice(0, 4))) {
+  console.warn(`⚠️  ${today.slice(0, 4)} 年的假日表还没续，见 scripts/trading-day.mjs`)
 }
 
 const previous = existsSync(OUTPUT) ? JSON.parse(readFileSync(OUTPUT, 'utf8')) : {}
