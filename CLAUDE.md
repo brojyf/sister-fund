@@ -65,6 +65,12 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 残缺活动列表倒推的估算，整条曲线骑着隔日翻转的 ±$51.16 时区伪影（成因和证据
 在 `README.md` 的「为什么不用 balanceHistory」）。sync 只写当天一个点，历史手工填。
 
+**`account.json` 里只放开盘日。** 周末休市余额不动，写进去只是重复点，
+`snaptrade-sync.mjs` 开头用 `isWeekend()` 直接退出，cron 也收成 `1-5`。美股假日
+没做表（每年都变，不值得维护），假日那天 sync 照跑、会写一个跟前一天相同的点，
+手工删掉即可。删这类点是安全的：`realNav` 是相邻比值连乘（等值点比值为 1），
+保底走 `daysBetween` 自然日而不是快照个数，删掉不改变任何保留日的数字。
+
 **快照日期一律走 `scripts/trading-day.mjs` 的 `newYorkDate()`。** 账户在美国，
 `new Date().toISOString()` 拿的是 UTC 日期，美东 20:00 之后跑就错位一天。
 
@@ -78,8 +84,8 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 
 ## 部署
 
-`.github/workflows/deploy.yml` 是唯一部署入口：push 到 `main`、每天 23:00 UTC
-或手动 `workflow_dispatch` 触发。**只有定时 run 会拉数据**：sync → test → build →
+`.github/workflows/deploy.yml` 是唯一部署入口：push 到 `main`、周一到周五
+23:00 UTC 或手动 `workflow_dispatch` 触发。**只有定时 run 会拉数据**：sync → test → build →
 `wrangler deploy` → 把 `account.json` commit 回 `main`；push 和手动触发跳过
 sync 与回写，只走 test → build → `wrangler deploy`，部署的是仓库里已有的
 `account.json`。本地不要跑 `wrangler deploy`。定时 run 会自动产生

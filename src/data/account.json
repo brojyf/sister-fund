@@ -1,18 +1,10 @@
 {
   "_comment": "账户总资产，美元，按美东日历日归档。今天这一格由 npm run snaptrade:sync 每天写入实时余额；今天之前的都是手工核对 Robinhood App 后填的真实值，sync 不会碰。2026-07-15 起的 2000 是占位数（账户起始资金 2k），对着 App 逐日改成真实总资产即可。不要拿 getAccountBalanceHistory 回填，理由见 README。",
-  "syncedAt": "2026-08-18",
+  "syncedAt": "2026-08-17",
   "accountId": "3a21527b-b6f7-4d9f-beca-c2e058fa7934",
   "snapshots": [
     {
       "date": "2026-06-26",
-      "totalValue": 2000
-    },
-    {
-      "date": "2026-06-27",
-      "totalValue": 2000
-    },
-    {
-      "date": "2026-06-28",
       "totalValue": 2000
     },
     {
@@ -29,18 +21,6 @@
     },
     {
       "date": "2026-07-02",
-      "totalValue": 2000
-    },
-    {
-      "date": "2026-07-03",
-      "totalValue": 2000
-    },
-    {
-      "date": "2026-07-04",
-      "totalValue": 2000
-    },
-    {
-      "date": "2026-07-05",
       "totalValue": 2000
     },
     {
@@ -64,14 +44,6 @@
       "totalValue": 2000
     },
     {
-      "date": "2026-07-11",
-      "totalValue": 2000
-    },
-    {
-      "date": "2026-07-12",
-      "totalValue": 2000
-    },
-    {
       "date": "2026-07-13",
       "totalValue": 2000
     },
@@ -89,14 +61,6 @@
     },
     {
       "date": "2026-07-17",
-      "totalValue": 1989.94
-    },
-    {
-      "date": "2026-07-18",
-      "totalValue": 1989.94
-    },
-    {
-      "date": "2026-07-19",
       "totalValue": 1989.94
     },
     {
@@ -120,14 +84,6 @@
       "totalValue": 1975.75
     },
     {
-      "date": "2026-07-25",
-      "totalValue": 1975.75
-    },
-    {
-      "date": "2026-07-26",
-      "totalValue": 1975.75
-    },
-    {
       "date": "2026-07-27",
       "totalValue": 2017.86
     },
@@ -145,14 +101,6 @@
     },
     {
       "date": "2026-07-31",
-      "totalValue": 1981.62
-    },
-    {
-      "date": "2026-08-01",
-      "totalValue": 1981.62
-    },
-    {
-      "date": "2026-08-02",
       "totalValue": 1981.62
     },
     {
@@ -176,14 +124,6 @@
       "totalValue": 2112.98
     },
     {
-      "date": "2026-08-08",
-      "totalValue": 2112.98
-    },
-    {
-      "date": "2026-08-09",
-      "totalValue": 2112.98
-    },
-    {
       "date": "2026-08-10",
       "totalValue": 2113.92
     },
@@ -204,19 +144,7 @@
       "totalValue": 2131.82
     },
     {
-      "date": "2026-08-15",
-      "totalValue": 2131.82
-    },
-    {
-      "date": "2026-08-16",
-      "totalValue": 2131.82
-    },
-    {
       "date": "2026-08-17",
-      "totalValue": 2134.98
-    },
-    {
-      "date": "2026-08-18",
       "totalValue": 2134.98
     }
   ]

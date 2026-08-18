@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { newYorkDate } from './trading-day.mjs'
+import { isWeekend, newYorkDate } from './trading-day.mjs'
 
 describe('快照日期按美东归档', () => {
   it('北京时间早上跑 sync，UTC 已经跳天，美东还在前一天', () => {
@@ -14,5 +14,17 @@ describe('快照日期按美东归档', () => {
   it('美东午夜之后才翻页', () => {
     expect(newYorkDate(new Date('2026-08-16T03:59:00Z'))).toBe('2026-08-15')
     expect(newYorkDate(new Date('2026-08-16T04:00:00Z'))).toBe('2026-08-16')
+  })
+})
+
+describe('周末不记快照', () => {
+  it('周六周日是周末', () => {
+    expect(isWeekend('2026-08-15')).toBe(true)
+    expect(isWeekend('2026-08-16')).toBe(true)
+  })
+
+  it('周一到周五不是', () => {
+    expect(isWeekend('2026-08-14')).toBe(false)
+    expect(isWeekend('2026-08-17')).toBe(false)
   })
 })

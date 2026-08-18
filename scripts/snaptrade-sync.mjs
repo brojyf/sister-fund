@@ -13,13 +13,19 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { snaptrade } from './snaptrade-client.mjs'
 import { mergeSnapshots } from './snapshot-history.mjs'
-import { newYorkDate } from './trading-day.mjs'
+import { isWeekend, newYorkDate } from './trading-day.mjs'
 import { ACCOUNT_ID } from './config.mjs'
 
 const OUTPUT = new URL('../src/data/account.json', import.meta.url)
 
 // 账户在美国，快照按美东日历日归档 —— 用 UTC 日期会把收盘后的余额记到第二天
 const today = newYorkDate()
+
+// 周末休市，余额跟周五收盘一模一样，写进去只是重复点。直接退出，连 API 都不用调。
+if (isWeekend(today)) {
+  console.log(`${today}（美东）是周末，休市不记快照`)
+  process.exit(0)
+}
 
 const previous = existsSync(OUTPUT) ? JSON.parse(readFileSync(OUTPUT, 'utf8')) : {}
 const recorded = previous.snapshots ?? []

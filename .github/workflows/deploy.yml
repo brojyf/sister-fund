@@ -1,12 +1,12 @@
 name: deploy
 
-# 代码改动即部署（不拉数据）；每天 23:00 UTC（美股收盘后）拉一次账户数据再部署。
+# 代码改动即部署（不拉数据）；周一到周五 23:00 UTC（美股收盘后）拉一次账户数据再部署。
 # 这是唯一的部署入口，本地不跑 wrangler deploy —— 手动发版用 workflow_dispatch。
 on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 23 * * *'
+    - cron: '0 23 * * 1-5'
   workflow_dispatch:
 
 # 定时任务会把 account.json commit 回 main，两个 run 并行会 push 冲突

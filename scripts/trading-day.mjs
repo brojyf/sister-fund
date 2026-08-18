@@ -15,3 +15,15 @@ const NEW_YORK = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York'
 export function newYorkDate(now = new Date()) {
   return NEW_YORK.format(now)
 }
+
+/**
+ * 周末休市，不记快照。美股假日不在这里管 —— 假日表每年都变，维护成本高于收益，
+ * 假日那天会写一个跟前一天相同的点，人工删掉即可。
+ *
+ * @param {string} date YYYY-MM-DD，美东当地日期
+ * @returns {boolean}
+ */
+export function isWeekend(date) {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay()
+  return day === 0 || day === 6
+}
