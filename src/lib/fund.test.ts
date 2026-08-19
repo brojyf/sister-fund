@@ -4,6 +4,7 @@ import {
   buildFundSeries,
   describeCashFlows,
   summarize,
+  summarizeAccountReturn,
   type AccountSnapshot,
   type CashFlow,
 } from './fund'
@@ -61,7 +62,7 @@ describe('账户只提供涨跌幅', () => {
 })
 
 describe('账户总资产的变动一律当成真实涨跌', () => {
-  it('总资产少了多少就算亏多少 —— 转账和月费要在 account.json 里手工扣掉', () => {
+  it('总资产少了多少就算亏多少', () => {
     const snapshots: AccountSnapshot[] = [
       { date: '2026-08-11', totalValue: 2_100 },
       { date: '2026-08-13', totalValue: 2_000 },
@@ -71,8 +72,7 @@ describe('账户总资产的变动一律当成真实涨跌', () => {
     expect(points[1].realNav).toBeCloseTo(2_000 / 2_100, 8)
   })
 
-  it('手工扣干净之后，账户走平就只剩保底在推', () => {
-    // 8-13 转出 50、月费 50，总资产写成扣掉这 100 之后的值
+  it('账户走平就只剩保底在推', () => {
     const snapshots: AccountSnapshot[] = [
       { date: '2026-08-11', totalValue: 2_100 },
       { date: '2026-08-13', totalValue: 2_100 },
@@ -510,5 +510,33 @@ describe('托管账户涨跌幅（不剔资金，固定本金为基数）', () =
 
     expect(points).toHaveLength(1)
     expect(points[0].cashFlow).toBe(0)
+  })
+})
+
+describe('summarizeAccountReturn', () => {
+  it('累计取最新一天，今日取最近两个快照之比', () => {
+    const points = buildAccountReturnSeries(
+      [
+        { date: '2026-08-17', totalValue: 2_134.98 },
+        { date: '2026-08-18', totalValue: 2_122.98 },
+      ],
+      2_000,
+    )
+    const account = summarizeAccountReturn(points)
+
+    expect(account?.totalReturnRate).toBeCloseTo(2_122.98 / 2_000 - 1, 10)
+    expect(account?.dayChange).toBeCloseTo(2_122.98 / 2_134.98 - 1, 10)
+  })
+
+  it('只有一个快照时今日是 0，不是 NaN', () => {
+    const points = buildAccountReturnSeries([{ date: '2026-08-18', totalValue: 2_200 }], 2_000)
+    const account = summarizeAccountReturn(points)
+
+    expect(account?.totalReturnRate).toBeCloseTo(0.1, 10)
+    expect(account?.dayChange).toBe(0)
+  })
+
+  it('没有快照返回 null', () => {
+    expect(summarizeAccountReturn([])).toBeNull()
   })
 })

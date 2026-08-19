@@ -5,9 +5,7 @@
  * （人民币，cash-flows.json）。账户负责提供「涨跌幅」，你负责提供「本金」，
  * 两者相乘才是她看到的钱。
  *
- * **账户总资产的变动一律当成真实涨跌。** 券商层面的资金进出（你自己的转账、
- * Gold 月费）没有单独的台账去剔除了 —— 要不让它污染毛毛的曲线，就在
- * account.json 里把那天的总资产写成扣掉这笔钱之后的值。
+ * **账户总资产的变动一律当成真实涨跌。** 券商层面没有单独的资金台账。
  *
  * 保底每天 0.01% 复利，超额部分抽成 50%，两者都以自然月为结算单位（锚点每月重置）。
  */
@@ -72,6 +70,31 @@ export function buildAccountReturnSeries(
   }
 
   return points
+}
+
+/** 托管账户走势图标题旁的两个数字 */
+export interface AccountReturnSummary {
+  /** 最新快照日的累计涨跌幅：总资产 ÷ 起始资金 − 1 */
+  totalReturnRate: number
+  /** 最新快照日相对上一个快照日的涨跌幅，只有一个点时是 0 */
+  dayChange: number
+}
+
+/**
+ * 两个点的 returnRate 都是同一个固定本金除出来的，所以 (1+今日)/(1+昨日) − 1
+ * 就等于总资产之比，不用把总资产再乘回去。
+ */
+export function summarizeAccountReturn(
+  points: AccountReturnPoint[],
+): AccountReturnSummary | null {
+  const latest = points[points.length - 1]
+  if (!latest) return null
+
+  const previous = points[points.length - 2]
+  const previousValue = previous ? 1 + previous.returnRate : 0
+  const dayChange = previousValue > 0 ? (1 + latest.returnRate) / previousValue - 1 : 0
+
+  return { totalReturnRate: latest.returnRate, dayChange }
 }
 
 /** 一笔资金变动。正数进，负数出 */
@@ -167,8 +190,7 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
 
     if (i > 0) {
       const previousValue = ordered[i - 1].totalValue
-      // 账户总资产的变动全部当成真实涨跌。要剔掉自己的转账和月费，
-      // 就在 account.json 里把当天的总资产写成扣掉那笔钱之后的值。
+      // 账户总资产的变动全部当成真实涨跌，不剔任何券商层面的资金进出。
       const dailyReturn = previousValue > 0 ? totalValue / previousValue - 1 : 0
       realNav *= 1 + dailyReturn
 

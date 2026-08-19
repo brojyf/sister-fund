@@ -4,6 +4,7 @@ import {
   buildFundSeries,
   describeCashFlows,
   summarize,
+  summarizeAccountReturn,
   DAILY_FLOOR_RATE,
   PERFORMANCE_FEE_RATE,
   type AccountReturnPoint,
@@ -15,7 +16,7 @@ import { EquityChart, type EquityPoint } from './components/EquityChart'
 import './App.css'
 
 export default function App() {
-  const { equityPoints, accountPoints, summary, latestDate, cashFlowRecords } = useMemo(() => {
+  const { equityPoints, accountPoints, accountReturn, summary, latestDate, cashFlowRecords } = useMemo(() => {
     const points = buildFundSeries({ snapshots, fundCashFlows })
     const equityPoints: EquityPoint[] = points.map((point) => ({
       date: point.date,
@@ -32,6 +33,7 @@ export default function App() {
     return {
       equityPoints,
       accountPoints,
+      accountReturn: summarizeAccountReturn(accountPoints),
       summary: summarize(points, fundCashFlows),
       latestDate: points[points.length - 1]?.date ?? '',
       cashFlowRecords: describeCashFlows(points, fundCashFlows),
@@ -82,7 +84,24 @@ export default function App() {
       </section>
 
       <section className="panel" aria-label="托管账户走势">
-        <h2 className="panel__title">托管账户走势</h2>
+        <div className="panel__head">
+          <h2 className="panel__title">托管账户走势</h2>
+          {accountReturn && (
+            <p className="panel__stats">
+              <span className={accountReturn.dayChange >= 0 ? 'delta delta--up' : 'delta delta--down'}>
+                {accountReturn.dayChange >= 0 ? '▲' : '▼'} 今日 {percent.format(accountReturn.dayChange)}
+              </span>
+              <span className="delta__divider" aria-hidden="true" />
+              <span
+                className={
+                  accountReturn.totalReturnRate >= 0 ? 'delta delta--up' : 'delta delta--down'
+                }
+              >
+                {percent.format(accountReturn.totalReturnRate)}
+              </span>
+            </p>
+          )}
+        </div>
         <div className="panel__chart">
           <AccountChart points={accountPoints} />
         </div>
