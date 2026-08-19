@@ -35,8 +35,13 @@ if (!coveredYears.has(today.slice(0, 4))) {
 const previous = existsSync(OUTPUT) ? JSON.parse(readFileSync(OUTPUT, 'utf8')) : {}
 const recorded = previous.snapshots ?? []
 
-const { data: accounts } = await snaptrade.accountInformation.listUserAccounts({})
-const account = accounts.find((candidate) => candidate.id === ACCOUNT_ID)
+// 必须用 getUserAccountDetails，不能用 listUserAccounts —— 后者文档里写死了
+// "returns Daily data regardless of the customer's plan"，不管买没买 real-time
+// 都只给隔夜缓存，拿到的是上一个交易日的收盘，会被贴上今天的日期。
+// getUserAccountDetails 在 real-time 计划下才是当场问券商要的实时值。
+const { data: account } = await snaptrade.accountInformation.getUserAccountDetails({
+  accountId: ACCOUNT_ID,
+})
 const totalValue = Number(account?.balance?.total?.amount)
 
 if (!Number.isFinite(totalValue)) {
