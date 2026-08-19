@@ -21,7 +21,7 @@ export default function App() {
     const equityPoints: EquityPoint[] = points.map((point) => ({
       date: point.date,
       equity: point.equity,
-      floorEquity: point.units * point.floorNav,
+      floorEquity: point.floorEquity,
     }))
     // 账户曲线画的是总资产比起始资金的涨跌幅，不剔资金进出 ——
     // 只吃 account.json，永远画到最新一个快照日；流水只是标在线上的点

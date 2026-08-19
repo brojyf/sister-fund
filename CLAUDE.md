@@ -53,10 +53,17 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 `fundCashFlows`（基金层面，人民币，用来发份额算本金）单位和用途都不同，
 混在一起测试不一定挂，但曲线会静默算错。
 
+**`equity` 不等于任何一个 nav 乘份额。** 毛毛的钱是**按笔记账**的：
+`buildFundSeries` 里每笔入金是一个 lot，锚点是它自己进来那天，跨月才重置，
+`equity` / `floorEquity` 是把所有 lot 加总出来的。`displayNav` / `grossNav` /
+`floorNav` 只是一条**参考净值**（「开张就放进去 1 块钱现在值多少」），给
+`npm run verify` 和整体口径用，**不要**拿它乘份额去还原毛毛的钱 —— 高点进来
+的那笔有自己更高的保底线，乘出来会偏低。逐笔明细在 `FundPoint.lots`，
+`describeCashFlows` 就是从那里取数的。取钱按 FIFO 扣，见 `withdrawFifo`。
+
 **两个口径不能混。** 托管账户图画的是**总资产 ÷ 固定本金 `ACCOUNT_BASE_CAPITAL`
 （$2,000）**，是账户的绝对水位（`buildAccountReturnSeries`，只吃 `account.json`）；
-毛毛的资产曲线是**逐日复利链 + 保底 + 抽成**（`buildFundSeries` 的 `realNav` /
-`displayNav`），起点永远是 1。账户那条线上入金会显出台阶，这是刻意的，别
+毛毛的资产曲线是**逐笔复利链 + 保底 + 抽成**加总。账户那条线上入金会显出台阶，这是刻意的，别
 「顺手修好」——理由写在 `buildAccountReturnSeries` 的注释里。基数也别改回
 「第一个快照」。
 

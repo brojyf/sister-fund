@@ -5,8 +5,10 @@ import {
   describeCashFlows,
   summarize,
   summarizeAccountReturn,
+  DAILY_FLOOR_RATE,
   type AccountSnapshot,
   type CashFlow,
+  type FundPoint,
 } from './fund'
 
 /** 生成一段日账户价值序列，用固定日收益率推进 */
@@ -194,7 +196,7 @@ describe('超额分成', () => {
     })
     const last = points[points.length - 1]
 
-    expect(last.feeAccrued).toBeCloseTo(last.units * (last.grossNav - last.displayNav), 8)
+    expect(last.feeAccrued).toBeCloseTo(last.grossEquity - last.equity, 8)
     expect(last.grossNav - last.displayNav).toBeCloseTo(
       0.5 * (last.grossNav - last.floorNav),
       8,
@@ -387,15 +389,23 @@ describe('基金流水', () => {
       { date: '2026-07-15', amount: 10_000 },
       { date: '2026-07-18', amount: 3_000 }, // 空档日，快照在 7-17 和 7-19
     ]
-    const points = buildFundSeries({ snapshots: sparse, fundCashFlows })
-    const records = describeCashFlows(points, fundCashFlows)
+    const onSnapshot: CashFlow[] = [
+      { date: '2026-07-15', amount: 10_000 },
+      { date: '2026-07-19', amount: 3_000 },
+    ]
+    const gap = describeCashFlows(
+      buildFundSeries({ snapshots: sparse, fundCashFlows }),
+      fundCashFlows,
+    )[0]
+    const sameDay = describeCashFlows(
+      buildFundSeries({ snapshots: sparse, fundCashFlows: onSnapshot }),
+      onSnapshot,
+    )[0]
 
-    // 7-18 那笔按 7-19 的净值买入，收益率只从 7-19 起算
-    const latestNav = points[points.length - 1].displayNav
-    const boughtAt = points.find((point) => point.date === '2026-07-19')!.displayNav
-    expect(records[0].date).toBe('2026-07-18')
-    expect(records[0].returnRate).toBeCloseTo(latestNav / boughtAt - 1, 10)
-    expect(records[0].gain).toBeCloseTo(3_000 * (latestNav / boughtAt - 1), 8)
+    // 7-18 那笔归到 7-19，所以跟直接写 7-19 的那笔算出来一模一样
+    expect(gap.date).toBe('2026-07-18')
+    expect(gap.returnRate).toBeCloseTo(sameDay.returnRate!, 12)
+    expect(gap.gain).toBeCloseTo(sameDay.gain!, 10)
   })
 
   it('每笔的收益率各算各的，后进来的钱不冒领之前的涨幅', () => {
@@ -538,5 +548,92 @@ describe('summarizeAccountReturn', () => {
 
   it('没有快照返回 null', () => {
     expect(summarizeAccountReturn([])).toBeNull()
+  })
+})
+
+
+describe('保底按笔给：每笔钱从自己进来那天起各长各的', () => {
+  /** 涨到 1-06 见顶，1-07 回撤 —— 全在同一个自然月内，不触发跨月重置 */
+  const peakThenDrop: AccountSnapshot[] = [
+    { date: '2026-01-05', totalValue: 2_000 },
+    { date: '2026-01-06', totalValue: 2_100 },
+    { date: '2026-01-07', totalValue: 2_000 },
+  ]
+
+  it('在高点进来的钱回撤后不亏，被自己那条保底线托住', () => {
+    const fundCashFlows: CashFlow[] = [{ date: '2026-01-06', amount: 1_000 }]
+    const points = buildFundSeries({ snapshots: peakThenDrop, fundCashFlows })
+    const record = describeCashFlows(points, fundCashFlows)[0]
+
+    // 账户从 2100 跌回 2000，但这笔钱只跟了 1 天，保底给 0.01%
+    expect(record.returnRate).toBeCloseTo(DAILY_FLOOR_RATE, 12)
+    expect(record.gain).toBeGreaterThan(0)
+  })
+
+  it('新入金不会抬高老钱的保底线', () => {
+    const seedOnly: CashFlow[] = [{ date: '2026-01-05', amount: 1_000 }]
+    const withTopUp: CashFlow[] = [...seedOnly, { date: '2026-01-06', amount: 5_000 }]
+
+    const alone = buildFundSeries({ snapshots: peakThenDrop, fundCashFlows: seedOnly })
+    const together = buildFundSeries({ snapshots: peakThenDrop, fundCashFlows: withTopUp })
+
+    const last = (points: FundPoint[]) => points[points.length - 1]
+    expect(last(together).lots[0].value).toBeCloseTo(last(alone).lots[0].value, 12)
+  })
+
+  it('每笔的保底线加起来就是「你的资产」图上那条线', () => {
+    const fundCashFlows: CashFlow[] = [
+      { date: '2026-01-05', amount: 1_000 },
+      { date: '2026-01-06', amount: 5_000 },
+    ]
+    const last = buildFundSeries({ snapshots: peakThenDrop, fundCashFlows }).at(-1)!
+
+    // 账户回撤到起点之下，两笔都贴着各自的保底线
+    expect(last.equity).toBeCloseTo(last.floorEquity, 10)
+    expect(last.floorEquity).toBeCloseTo(
+      1_000 * (1 + DAILY_FLOOR_RATE) ** 2 + 5_000 * (1 + DAILY_FLOOR_RATE),
+      10,
+    )
+  })
+})
+
+describe('取钱按 FIFO 从最早那笔扣起', () => {
+  const flat: AccountSnapshot[] = [
+    { date: '2026-01-05', totalValue: 2_000 },
+    { date: '2026-01-06', totalValue: 2_000 },
+    { date: '2026-01-07', totalValue: 2_000 },
+  ]
+
+  it('扣完最早那笔才动下一笔', () => {
+    const fundCashFlows: CashFlow[] = [
+      { date: '2026-01-05', amount: 1_000 },
+      { date: '2026-01-06', amount: 1_000 },
+      { date: '2026-01-07', amount: -1_200 },
+    ]
+    const last = buildFundSeries({ snapshots: flat, fundCashFlows }).at(-1)!
+
+    expect(last.lots[0].value).toBeCloseTo(0, 10)
+    expect(last.lots[0].principal).toBeCloseTo(0, 10)
+    expect(last.lots[1].value).toBeGreaterThan(0)
+    expect(last.equity).toBeCloseTo(
+      1_000 * (1 + DAILY_FLOOR_RATE) ** 2 + 1_000 * (1 + DAILY_FLOOR_RATE) - 1_200,
+      10,
+    )
+  })
+
+  it('只扣掉一部分时，剩下那部分的收益率不受影响', () => {
+    const keep: CashFlow[] = [{ date: '2026-01-05', amount: 1_000 }]
+    const partial: CashFlow[] = [...keep, { date: '2026-01-06', amount: -400 }]
+
+    const untouched = describeCashFlows(
+      buildFundSeries({ snapshots: flat, fundCashFlows: keep }),
+      keep,
+    ).at(-1)!
+    const drawn = describeCashFlows(
+      buildFundSeries({ snapshots: flat, fundCashFlows: partial }),
+      partial,
+    ).at(-1)!
+
+    expect(drawn.returnRate).toBeCloseTo(untouched.returnRate!, 12)
   })
 })

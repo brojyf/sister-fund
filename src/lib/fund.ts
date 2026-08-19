@@ -112,21 +112,44 @@ export interface FundInput {
   fundCashFlows?: CashFlow[]
 }
 
+/**
+ * 一笔入金到某一天为止的状态。保底是**按笔**给的：每笔钱从自己进来那天起
+ * 单独长一条保底线，所以在高点进来的钱不会因为整体回撤而显示成亏损。
+ */
+export interface LotSnapshot {
+  /** 对应 fundCashFlows 里那笔入金的下标 */
+  flowIndex: number
+  /** 还留在基金里的本金，被取钱按比例扣减过 */
+  principal: number
+  /** 毛毛看到的这笔钱现在值多少 */
+  value: number
+}
+
 export interface FundPoint {
   date: string
   /** 账户的原始净值，不含保底也不含抽成 */
   realNav: number
-  /** 本月原始表现直接兑现的话的净值，用来对比抽成拿走了多少 */
+  /**
+   * 以下三条是**参考净值**：假设开张第一天就放进去 1 块钱，它现在值多少。
+   * 用来看整体口径和对账（npm run verify），**不是**毛毛的钱的算法 ——
+   * 真正的钱按笔记账，equity ≠ 任何一个 nav 乘份额。
+   */
   grossNav: number
-  /** 毛毛看到的净值：保底托底，超额部分抽成后 */
+  /** 参考净值：保底托底、超额抽成后 */
   displayNav: number
-  /** 当日保底线 */
+  /** 参考净值的当日保底线 */
   floorNav: number
-  /** 毛毛持有的份额 */
-  units: number
-  /** 毛毛看到的钱 = units × displayNav */
+  /** 毛毛看到的钱 = 每笔入金各自算完之后加总 */
   equity: number
-  /** 当日是否被保底托住了 */
+  /** 每笔入金的保底价值加总，就是「你的资产」图上那条保底线 */
+  floorEquity: number
+  /** 不抽成的话毛毛会有多少，用来对比抽成拿走了多少 */
+  grossEquity: number
+  /** 当期收益：只算上一期就在场的钱涨了多少，不含这期新加的 */
+  dayGain: number
+  /** 逐笔明细，资金流水表按笔取数用 */
+  lots: LotSnapshot[]
+  /** 每一笔钱的真实表现都跑输了自己那条保底线，即首页那句「现在正在走保底」 */
   isFloored: boolean
   /** 累计被抽走的超额分成，折成钱 */
   feeAccrued: number
@@ -152,20 +175,60 @@ function monthKey(date: string): string {
  * 所以资金变动要按「上一个快照之后、到这个快照为止」的区间归集，
  * 否则落在空档日的那笔钱会被漏掉，收益率就脏了。
  */
-function sumInWindow(flows: CashFlow[], after: string | null, until: string): number {
+function flowsInWindow(
+  flows: CashFlow[],
+  after: string | null,
+  until: string,
+): { flow: CashFlow; index: number }[] {
   return flows
-    .filter((flow) => flow.date <= until && (after === null || flow.date > after))
-    .reduce((sum, flow) => sum + flow.amount, 0)
+    .map((flow, index) => ({ flow, index }))
+    .filter(({ flow }) => flow.date <= until && (after === null || flow.date > after))
+    .sort((a, b) => a.flow.date.localeCompare(b.flow.date))
 }
 
 /**
- * 当月保底线锚点。每进入新的自然月，锚点重置为上月最后一天的展示净值，
- * 于是上个月已经兑现的收益（含被保底抬上去的部分）成为新的起跑线。
+ * 保底锚点。每进入新的自然月，锚点重置为上月最后一天的值，于是上个月已经
+ * 兑现的收益（含被保底抬上去的部分）成为新的起跑线。
  */
-interface MonthSegment {
+interface Anchor {
+  date: string
+  realNav: number
+}
+
+/** 一笔入金的完整记账状态。保底线从它自己进来那天起长，跨月才重置锚点 */
+interface Lot extends LotSnapshot {
   anchorDate: string
   anchorRealNav: number
-  anchorDisplayNav: number
+  /** 锚点日这笔钱值多少，当月所有比例都乘在它上面 */
+  anchorValue: number
+  floorValue: number
+  grossValue: number
+  /** 真实表现跑输了自己那条保底线，靠补足托着 */
+  isFloored: boolean
+  feeAccrued: number
+  /** 本月已计过抽成的超额比例，跨月清零 */
+  feeCountedThisMonth: number
+}
+
+/**
+ * 取钱按 FIFO 从最早那笔入金开始扣，扣不够就往后顺延。
+ * 本金和锚点价值按同比例缩，这样「剩下的钱」的保底线和收益率都不受影响。
+ */
+function withdrawFifo(lots: Lot[], amount: number): void {
+  let remaining = amount
+  for (const lot of lots) {
+    if (remaining <= 0) break
+    if (lot.value <= 0) continue
+
+    const taken = Math.min(lot.value, remaining)
+    const kept = 1 - taken / lot.value
+    lot.principal *= kept
+    lot.anchorValue *= kept
+    lot.floorValue *= kept
+    lot.grossValue *= kept
+    lot.value -= taken
+    remaining -= taken
+  }
 }
 
 export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): FundPoint[] {
@@ -173,67 +236,89 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
   if (ordered.length === 0) return []
 
   const points: FundPoint[] = []
+  const lots: Lot[] = []
   let realNav = 1
-  let units = 0
-  let feeAccrued = 0
-  // 本月已计过抽成的超额比例，跨月清零（上个月的已经结算进锚点了）
-  let feeCountedThisMonth = 0
-  let segment: MonthSegment = {
-    anchorDate: ordered[0].date,
-    anchorRealNav: 1,
-    anchorDisplayNav: 1,
-  }
+
+  // 参考净值那条链：假设开张第一天就放进去 1 块钱。只用于展示和对账。
+  let reference: Anchor = { date: ordered[0].date, realNav: 1 }
+  let referenceDisplayNav = 1
 
   for (let i = 0; i < ordered.length; i++) {
     const { date, totalValue } = ordered[i]
     const previousDate = i > 0 ? ordered[i - 1].date : null
+    const previous = i > 0 ? points[i - 1] : null
 
-    if (i > 0) {
+    if (previous) {
       const previousValue = ordered[i - 1].totalValue
       // 账户总资产的变动全部当成真实涨跌，不剔任何券商层面的资金进出。
       const dailyReturn = previousValue > 0 ? totalValue / previousValue - 1 : 0
       realNav *= 1 + dailyReturn
 
-      const previous = points[i - 1]
       if (monthKey(date) !== monthKey(previous.date)) {
-        segment = {
-          anchorDate: previous.date,
-          anchorRealNav: previous.realNav,
-          anchorDisplayNav: previous.displayNav,
-        }
-        feeCountedThisMonth = 0
+        reference = { date: previous.date, realNav: previous.realNav }
+        referenceDisplayNav = previous.displayNav
       }
     }
 
-    // 保底逐日累加，但**结算单位仍然是自然月**：锚点每月重置，所以上个月已兑现的
-    // 收益不会被这个月吃掉，这个月的抽成也不会追溯上个月。保底线是从当月锚点起
-    // 按天数复利长出来的，不是从开张那天一路长上来的。
+    // 保底逐日累加，但**结算单位是自然月**：锚点每月重置，所以上个月已兑现的
+    // 收益不会被这个月吃掉，这个月的抽成也不会追溯上个月。
     // 用自然日天数而不是快照个数：快照断了一天，那天的保底也照给。
-    const realRatio = realNav / segment.anchorRealNav
-    const floorRatio = (1 + DAILY_FLOOR_RATE) ** daysBetween(segment.anchorDate, date)
-
+    const referenceRealRatio = realNav / reference.realNav
+    const referenceFloorRatio = (1 + DAILY_FLOOR_RATE) ** daysBetween(reference.date, date)
     // 跑赢保底的部分抽走一半；跑输就由保底线托住，不倒扣
-    const excessRatio = Math.max(0, realRatio - floorRatio)
-    const displayRatio = floorRatio + (1 - PERFORMANCE_FEE_RATE) * excessRatio
+    const referenceExcess = Math.max(0, referenceRealRatio - referenceFloorRatio)
 
-    const grossNav = segment.anchorDisplayNav * realRatio
-    const floorNav = segment.anchorDisplayNav * floorRatio
-    const displayNav = segment.anchorDisplayNav * displayRatio
+    const grossNav = referenceDisplayNav * referenceRealRatio
+    const floorNav = referenceDisplayNav * referenceFloorRatio
+    const displayNav =
+      referenceDisplayNav * (referenceFloorRatio + (1 - PERFORMANCE_FEE_RATE) * referenceExcess)
 
-    // 毛毛的钱按当日净值买份额，所以入金只增加等额的钱，不凭空产生收益
-    // 抽成按当期新增的超额计，并且用「这期加钱之前」的份额 ——
-    // 新入的钱是按已经扣过抽成的净值买的，不该再为之前的涨幅付一次钱。
-    // 超额回落时增量为负，等于把没落袋的抽成退回去。
-    const feeIncrement =
-      units *
-      segment.anchorDisplayNav *
-      PERFORMANCE_FEE_RATE *
-      (excessRatio - feeCountedThisMonth)
-    feeAccrued += feeIncrement
-    feeCountedThisMonth = excessRatio
+    // 每笔钱各自推进一天：锚点是它自己进来那天，跨月才重置
+    const valueBefore = lots.map((lot) => lot.value)
+    for (const lot of lots) {
+      if (previous && monthKey(date) !== monthKey(previous.date)) {
+        lot.anchorDate = previous.date
+        lot.anchorRealNav = previous.realNav
+        lot.anchorValue = lot.value
+        lot.feeCountedThisMonth = 0
+      }
 
-    const fundFlow = sumInWindow(fundCashFlows, previousDate, date)
-    if (fundFlow !== 0) units += fundFlow / displayNav
+      const realRatio = realNav / lot.anchorRealNav
+      const floorRatio = (1 + DAILY_FLOOR_RATE) ** daysBetween(lot.anchorDate, date)
+      const excess = Math.max(0, realRatio - floorRatio)
+
+      // 超额回落时增量为负，等于把没落袋的抽成退回去
+      lot.feeAccrued +=
+        lot.anchorValue * PERFORMANCE_FEE_RATE * (excess - lot.feeCountedThisMonth)
+      lot.feeCountedThisMonth = excess
+
+      lot.floorValue = lot.anchorValue * floorRatio
+      lot.grossValue = lot.anchorValue * realRatio
+      lot.value = lot.anchorValue * (floorRatio + (1 - PERFORMANCE_FEE_RATE) * excess)
+      lot.isFloored = realRatio < floorRatio
+    }
+    const dayGain = lots.reduce((sum, lot, index) => sum + lot.value - valueBefore[index], 0)
+
+    // 加钱开一笔新的、从今天起自己长保底；取钱按 FIFO 从最早那笔扣起
+    for (const { flow, index } of flowsInWindow(fundCashFlows, previousDate, date)) {
+      if (flow.amount > 0) {
+        lots.push({
+          flowIndex: index,
+          principal: flow.amount,
+          value: flow.amount,
+          anchorDate: date,
+          anchorRealNav: realNav,
+          anchorValue: flow.amount,
+          floorValue: flow.amount,
+          grossValue: flow.amount,
+          isFloored: false,
+          feeAccrued: 0,
+          feeCountedThisMonth: 0,
+        })
+      } else if (flow.amount < 0) {
+        withdrawFifo(lots, -flow.amount)
+      }
+    }
 
     points.push({
       date,
@@ -241,10 +326,14 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
       grossNav,
       displayNav,
       floorNav,
-      units,
-      equity: units * displayNav,
-      isFloored: realRatio < floorRatio,
-      feeAccrued,
+      equity: lots.reduce((sum, lot) => sum + lot.value, 0),
+      floorEquity: lots.reduce((sum, lot) => sum + lot.floorValue, 0),
+      grossEquity: lots.reduce((sum, lot) => sum + lot.grossValue, 0),
+      dayGain,
+      lots: lots.map(({ flowIndex, principal, value }) => ({ flowIndex, principal, value })),
+      // 有一笔跑赢保底就不算走保底 —— 每笔都在靠补足托着才是
+      isFloored: lots.length > 0 && lots.every((lot) => lot.isFloored),
+      feeAccrued: lots.reduce((sum, lot) => sum + lot.feeAccrued, 0),
     })
   }
 
@@ -265,9 +354,9 @@ export interface CashFlowRecord extends CashFlow {
 /**
  * 把基金流水对齐到净值曲线上，算出每一笔到今天赚了多少。
  *
- * 每笔钱是按进来那天的净值买的份额，所以它自己的收益率就是
- * 「最新净值 ÷ 进来那天的净值 − 1」—— 后进来的钱只跟了一小段，
- * 收益率天然低于整体涨幅，这正是要分笔展示的原因。
+ * 直接读最新一天的逐笔明细：每笔钱有自己的保底线，所以它的收益率是
+ * 「这笔现在值多少 ÷ 还剩多少本金 − 1」，不是拿整体净值相除。后进来的钱
+ * 只跟了一小段，收益率天然低于整体涨幅，这正是要分笔展示的原因。
  *
  * 流水日期如果不在快照日上，归到之后第一个有快照的那天。
  */
@@ -278,16 +367,22 @@ export function describeCashFlows(
   const latest = points[points.length - 1]
   if (!latest) return []
 
+  const lotByFlow = new Map(latest.lots.map((lot) => [lot.flowIndex, lot]))
+
   return fundCashFlows
-    .map((flow) => {
-      const point = points.find((candidate) => candidate.date >= flow.date)
-      if (!point) return null
-      const returnRate = flow.amount > 0 ? latest.displayNav / point.displayNav - 1 : null
-      return {
-        ...flow,
-        returnRate,
-        gain: returnRate === null ? null : flow.amount * returnRate,
+    .map((flow, index): CashFlowRecord | null => {
+      // 取钱是把钱拿走，没有「到今天赚了多少」可言
+      if (flow.amount <= 0) {
+        const point = points.find((candidate) => candidate.date >= flow.date)
+        return point ? { ...flow, returnRate: null, gain: null } : null
       }
+
+      // 落在最后一个快照之后的入金没有点可挂，也就没开出这一笔
+      const lot = lotByFlow.get(index)
+      if (!lot) return null
+
+      const gain = lot.value - lot.principal
+      return { ...flow, returnRate: lot.principal > 0 ? gain / lot.principal : 0, gain }
     })
     .filter((record): record is CashFlowRecord => record !== null)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -319,7 +414,6 @@ export function summarize(
   if (points.length === 0) return null
 
   const latest = points[points.length - 1]
-  const previous = points[points.length - 2]
   const principal = fundCashFlows
     .filter((flow) => flow.date <= latest.date)
     .reduce((sum, flow) => sum + flow.amount, 0)
@@ -329,8 +423,8 @@ export function summarize(
     principal,
     totalGain: latest.equity - principal,
     totalReturnRate: principal > 0 ? latest.equity / principal - 1 : 0,
-    // 用上一期的份额乘净值涨幅，这样当期新加的钱不会被算成收益
-    dayGain: previous ? previous.units * (latest.displayNav - previous.displayNav) : 0,
+    // 逐笔算出来的当期收益，当期新加的钱不参与
+    dayGain: latest.dayGain,
     isFloored: latest.isFloored,
     performanceFee: latest.feeAccrued,
   }
