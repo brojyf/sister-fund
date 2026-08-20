@@ -34,6 +34,19 @@
   border-bottom: 1px solid var(--ink);
 }
 
+.masthead__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.masthead__icon {
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: 0 0 auto;
+}
+
 .masthead h1 {
   margin: 0;
   font-family: var(--font-display);

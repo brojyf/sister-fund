@@ -47,9 +47,12 @@ export default function App() {
   return (
     <main className="sheet">
       <header className="masthead">
-        <div className="masthead__title">
-          <h1>毛毛基金</h1>
-          <p className="masthead__latin">Maomao Fund</p>
+        <div className="masthead__brand">
+          <img className="masthead__icon" src="/favicon-maomao.png" alt="" width="56" height="56" />
+          <div className="masthead__title">
+            <h1>毛毛基金</h1>
+            <p className="masthead__latin">Maomao Fund</p>
+          </div>
         </div>
         <time className="masthead__date">{formatChineseDate(latestDate)}</time>
       </header>
