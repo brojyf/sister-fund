@@ -1,6 +1,6 @@
 {
   "_comment": "账户总资产，美元，按美东日历日归档。今天这一格由 npm run snaptrade:sync 每天写入实时余额；今天之前的都是手工核对 Robinhood App 后填的真实值，sync 不会碰。2026-07-15 起的 2000 是占位数（账户起始资金 2k），对着 App 逐日改成真实总资产即可。不要拿 getAccountBalanceHistory 回填，理由见 README。",
-  "syncedAt": "2026-09-04",
+  "syncedAt": "2026-09-08",
   "accountId": "3a21527b-b6f7-4d9f-beca-c2e058fa7934",
   "snapshots": [
     {
@@ -198,6 +198,10 @@
     {
       "date": "2026-09-04",
       "totalValue": 2195.08
+    },
+    {
+      "date": "2026-09-08",
+      "totalValue": 2195.02
     }
   ]
 }
