@@ -42,6 +42,18 @@ const recorded = previous.snapshots ?? []
 const { data: account } = await snaptrade.accountInformation.getUserAccountDetails({
   accountId: ACCOUNT_ID,
 })
+// 连接被 Robinhood 踢掉后，上面那个接口不会报错，而是一直返回掉线前最后一次同步的
+// 缓存余额 —— 2026-09-20 掉线后连续 5 个交易日都被记成 2222.77。宁可让 CI 挂掉。
+const { data: connection } = await snaptrade.connections.detailBrokerageAuthorization({
+  authorizationId: account.brokerage_authorization,
+})
+if (connection.disabled) {
+  throw new Error(
+    `Robinhood 连接 ${connection.disabled_date} 起已失效，余额是缓存值，不记快照。` +
+      '运行 npm run snaptrade:connect 重新授权',
+  )
+}
+
 const totalValue = Number(account?.balance?.total?.amount)
 
 if (!Number.isFinite(totalValue)) {
