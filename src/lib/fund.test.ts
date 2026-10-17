@@ -35,6 +35,104 @@ function seedFund(startDate: string): CashFlow[] {
   return [{ date: startDate, amount: 10_000 }]
 }
 
+describe('按当天账户净值转让已有份额', () => {
+  const snapshots: AccountSnapshot[] = [
+    { date: '2026-01-05', totalValue: 2_000 },
+    { date: '2026-01-06', totalValue: 2_200 },
+    { date: '2026-01-07', totalValue: 2_420 },
+  ]
+
+  it('不同价格买入分别折算份额，只分享买入后的涨跌', () => {
+    const flows = [
+      { date: '2026-01-05', amount: 1_000 },
+      { date: '2026-01-06', amount: 1_100 },
+    ]
+    const points = buildFundSeries({ snapshots, fundCashFlows: flows })
+    const [late, early] = describeCashFlows(points, flows)
+
+    expect(early.purchaseNav).toBe(1)
+    expect(late.purchaseNav).toBeCloseTo(1.1, 10)
+    expect(early.shares).toBeCloseTo(1_000, 10)
+    expect(late.shares).toBeCloseTo(1_000, 10)
+    expect(early.rawGain).toBeCloseTo(210, 8)
+    expect(late.rawGain).toBeCloseTo(110, 8)
+    expect(early.rawReturnRate).toBeCloseTo(0.21, 10)
+    expect(late.rawReturnRate).toBeCloseTo(0.1, 10)
+    expect(points[1].lots[1].rawValue).toBeCloseTo(1_100, 8)
+    expect(points[2].rawEquity).toBeCloseTo(2_420, 8)
+    expect(summarize(points, flows)?.rawReturnRate).toBeCloseTo(320 / 2_100, 10)
+    expect(summarize(points, flows)?.shares).toBeCloseTo(2_000, 10)
+  })
+
+  it('购买只是转让，不影响账户净值或原有份额', () => {
+    const flows = [{ date: '2026-01-05', amount: 1_000 }]
+    const before = structuredClone(snapshots)
+    const alone = buildFundSeries({ snapshots, fundCashFlows: flows })
+    const transferred = buildFundSeries({
+      snapshots,
+      fundCashFlows: [...flows, { date: '2026-01-06', amount: 1_100 }],
+    })
+
+    expect(transferred.map((point) => point.realNav)).toEqual(alone.map((point) => point.realNav))
+    expect(transferred[2].lots[0]).toEqual(alone[2].lots[0])
+    expect(snapshots).toEqual(before)
+  })
+
+  it('份额原始盈亏可以为负，结算仍按原约定保底', () => {
+    const flows = [{ date: '2026-01-06', amount: 1_100 }]
+    const points = buildFundSeries({
+      snapshots: [...snapshots.slice(0, 2), { date: '2026-01-07', totalValue: 2_000 }],
+      fundCashFlows: flows,
+    })
+    const record = describeCashFlows(points, flows)[0]
+
+    expect(record.rawGain).toBeCloseTo(-100, 8)
+    expect(record.rawReturnRate).toBeCloseTo(2_000 / 2_200 - 1, 10)
+    expect(record.gain).toBeCloseTo(0.11, 8)
+    expect(record.returnRate).toBeCloseTo(DAILY_FLOOR_RATE, 10)
+  })
+
+  it('原始份额跨月不重置，结算金额继续保底并复投上月收益', () => {
+    const flows = [{ date: '2026-01-01', amount: 1_000 }]
+    const points = buildFundSeries({
+      snapshots: [
+        { date: '2026-01-01', totalValue: 2_000 },
+        { date: '2026-01-31', totalValue: 2_200 },
+        { date: '2026-02-28', totalValue: 2_200 },
+      ],
+      fundCashFlows: flows,
+    })
+    const last = points[2]
+    const januaryFloor = 1.0001 ** 30
+    const januaryValue = 1_000 * (januaryFloor + 0.5 * (1.1 - januaryFloor))
+
+    expect(last.lots[0].shares).toBeCloseTo(1_000, 10)
+    expect(last.lots[0].purchaseNav).toBe(1)
+    expect(last.rawEquity).toBeCloseTo(1_100, 8)
+    expect(last.equity).toBeCloseTo(januaryValue * 1.0001 ** 28, 8)
+    expect(describeCashFlows(points, flows)[0].rawReturnRate).toBeCloseTo(0.1, 10)
+  })
+
+  it('FIFO 部分卖出按结算价值回购，份额与成本同比例减少', () => {
+    const buy = { date: '2026-01-05', amount: 1_000 }
+    const holding = buildFundSeries({ snapshots, fundCashFlows: [buy] })
+    const flows = [buy, { date: '2026-01-06', amount: -holding[1].equity / 2 }]
+    const points = buildFundSeries({ snapshots, fundCashFlows: flows })
+    const [sale, purchase] = describeCashFlows(points, flows)
+
+    expect(purchase.shares).toBeCloseTo(500, 10)
+    expect(purchase.rawGain).toBeCloseTo(105, 8)
+    expect(purchase.rawReturnRate).toBeCloseTo(0.21, 10)
+    expect(points[2].lots[0].principal).toBeCloseTo(500, 8)
+    expect(summarize(points, flows)?.rawGain).toBeCloseTo(105, 8)
+    expect(summarize(points, flows)?.rawReturnRate).toBeCloseTo(0.21, 10)
+    expect(sale.shares).toBeNull()
+    expect(sale.purchaseNav).toBeNull()
+    expect(sale.rawGain).toBeNull()
+    expect(sale.rawReturnRate).toBeNull()
+  })
+})
+
 describe('账户只提供涨跌幅', () => {
   it('账户规模与毛毛的本金无关，只贡献涨幅', () => {
     const snapshots = ramp('2026-01-01', 31, 5_000, 0.002)

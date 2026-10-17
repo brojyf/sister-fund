@@ -43,6 +43,9 @@ console.log(
 )
 console.log(`本金 ${principal.toFixed(2)}  →  现在 ${last.equity.toFixed(2)}`)
 console.log(`累计抽成 ${last.feeAccrued.toFixed(2)}`)
+const remainingCost = last.lots.reduce((sum, lot) => sum + lot.principal, 0)
+console.log(`持有份额 ${last.lots.reduce((sum, lot) => sum + lot.shares, 0).toFixed(4)}`)
+console.log(`份额原始市值 ${last.rawEquity.toFixed(2)}  原始盈亏 ${(last.rawEquity - remainingCost).toFixed(2)}`)
 
 console.log('\n逐笔：')
 for (const record of describeCashFlows(points, fundCashFlows)) {
@@ -51,4 +54,7 @@ for (const record of describeCashFlows(points, fundCashFlows)) {
   console.log(
     `  ${record.date}  ${record.amount.toFixed(2).padStart(10)}  ${rate.padStart(9)}  ${gain.padStart(9)}  ${record.note ?? ''}`,
   )
+  if (record.shares !== null && record.purchaseNav !== null && record.rawReturnRate !== null) {
+    console.log(`    份额 ${record.shares.toFixed(4)}  买入净值 ${record.purchaseNav.toFixed(4)}  原始收益率 ${(record.rawReturnRate * 100).toFixed(3)}%`)
+  }
 }

@@ -100,12 +100,27 @@
 
 .hero__deltas {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 1.1rem;
   margin: 1.5rem 0 0;
   font-family: var(--font-mono);
   font-size: 0.95rem;
+}
+
+.hero__raw {
+  margin: 0.8rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.hero__raw span {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
 }
 
 .delta {
@@ -332,8 +347,27 @@
 
 .flows__table {
   width: 100%;
+  min-width: 48rem;
   border-collapse: collapse;
   font-size: 0.9rem;
+}
+
+.flows__holding {
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.flows__scroll {
+  overflow-x: auto;
+}
+
+.flows__nav {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--ink-faint);
+  font-size: 0.72rem;
 }
 
 .flows__table th {
@@ -371,7 +405,7 @@
     gap: 0.7rem;
     font-size: 0.85rem;
   }
-  /* 手机上四列都要留，靠缩字号和收紧留白挤，别再折行 */
+  /* 明细可横向滚动，保留份额及两个收益口径 */
   .flows__table th {
     font-size: 0.68rem;
     letter-spacing: 0.06em;

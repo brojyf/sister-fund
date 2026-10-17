@@ -2,8 +2,8 @@
  * 基金净值计算。
  *
  * 输入只有两样：账户每日总资产（美元，account.json）和毛毛的加钱/取钱
- * （人民币，cash-flows.json）。账户负责提供「涨跌幅」，你负责提供「本金」，
- * 两者相乘才是她看到的钱。
+ * （人民币，cash-flows.json）。毛毛买入管理人已有份额，不向账户增资。
+ * 固定汇率、不计汇兑损益，初始净值归一为 1；买入金额 ÷ 当天原始净值 = 份额。
  *
  * **账户总资产的变动一律当成真实涨跌。** 券商层面没有单独的资金台账。
  *
@@ -121,6 +121,12 @@ export interface LotSnapshot {
   flowIndex: number
   /** 还留在基金里的本金，被取钱按比例扣减过 */
   principal: number
+  /** 买入时的账户原始净值，跨月不重置 */
+  purchaseNav: number
+  /** 剩余持有份额；买入是从管理人转让，卖出按结算价值同比例扣减 */
+  shares: number
+  /** 剩余份额 × 当前原始净值，不含保底和分成 */
+  rawValue: number
   /** 毛毛看到的这笔钱现在值多少 */
   value: number
 }
@@ -143,8 +149,10 @@ export interface FundPoint {
   equity: number
   /** 每笔入金的保底价值加总，就是「你的资产」图上那条保底线 */
   floorEquity: number
-  /** 不抽成的话毛毛会有多少，用来对比抽成拿走了多少 */
+  /** 从当月结算锚点推进、未计本月保底和抽成的市值；不同于原始份额市值 */
   grossEquity: number
+  /** 买入份额的原始市值，跨月不把结算收益混入 */
+  rawEquity: number
   /** 当期收益：只算上一期就在场的钱涨了多少，不含这期新加的 */
   dayGain: number
   /** 逐笔明细，资金流水表按笔取数用 */
@@ -223,6 +231,8 @@ function withdrawFifo(lots: Lot[], amount: number): void {
     const taken = Math.min(lot.value, remaining)
     const kept = 1 - taken / lot.value
     lot.principal *= kept
+    lot.shares *= kept
+    lot.rawValue *= kept
     lot.anchorValue *= kept
     lot.floorValue *= kept
     lot.grossValue *= kept
@@ -294,6 +304,7 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
 
       lot.floorValue = lot.anchorValue * floorRatio
       lot.grossValue = lot.anchorValue * realRatio
+      lot.rawValue = lot.shares * realNav
       lot.value = lot.anchorValue * (floorRatio + (1 - PERFORMANCE_FEE_RATE) * excess)
       lot.isFloored = realRatio < floorRatio
     }
@@ -305,6 +316,9 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
         lots.push({
           flowIndex: index,
           principal: flow.amount,
+          purchaseNav: realNav,
+          shares: flow.amount / realNav,
+          rawValue: flow.amount,
           value: flow.amount,
           anchorDate: date,
           anchorRealNav: realNav,
@@ -329,8 +343,11 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
       equity: lots.reduce((sum, lot) => sum + lot.value, 0),
       floorEquity: lots.reduce((sum, lot) => sum + lot.floorValue, 0),
       grossEquity: lots.reduce((sum, lot) => sum + lot.grossValue, 0),
+      rawEquity: lots.reduce((sum, lot) => sum + lot.rawValue, 0),
       dayGain,
-      lots: lots.map(({ flowIndex, principal, value }) => ({ flowIndex, principal, value })),
+      lots: lots.map(({ flowIndex, principal, purchaseNav, shares, rawValue, value }) => ({
+        flowIndex, principal, purchaseNav, shares, rawValue, value,
+      })),
       // 有一笔跑赢保底就不算走保底 —— 每笔都在靠补足托着才是
       isFloored: lots.length > 0 && lots.every((lot) => lot.isFloored),
       feeAccrued: lots.reduce((sum, lot) => sum + lot.feeAccrued, 0),
@@ -342,6 +359,12 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
 
 /** 一笔基金流水，附上它到今天为止赚了多少 */
 export interface CashFlowRecord extends CashFlow {
+  /** 剩余持有份额与买入净值；卖出行不展示持仓指标 */
+  shares: number | null
+  purchaseNav: number | null
+  /** 剩余份额的原始盈亏，不含保底和分成 */
+  rawGain: number | null
+  rawReturnRate: number | null
   /**
    * 这笔钱从进来那天到最新一天赚了多少。
    * 取钱是把钱拿走，没有「到今天赚了多少」可言，记 null。
@@ -374,7 +397,15 @@ export function describeCashFlows(
       // 取钱是把钱拿走，没有「到今天赚了多少」可言
       if (flow.amount <= 0) {
         const point = points.find((candidate) => candidate.date >= flow.date)
-        return point ? { ...flow, returnRate: null, gain: null } : null
+        return point ? {
+          ...flow,
+          shares: null,
+          purchaseNav: null,
+          rawGain: null,
+          rawReturnRate: null,
+          returnRate: null,
+          gain: null,
+        } : null
       }
 
       // 落在最后一个快照之后的入金没有点可挂，也就没开出这一笔
@@ -382,7 +413,16 @@ export function describeCashFlows(
       if (!lot) return null
 
       const gain = lot.value - lot.principal
-      return { ...flow, returnRate: lot.principal > 0 ? gain / lot.principal : 0, gain }
+      const rawGain = lot.rawValue - lot.principal
+      return {
+        ...flow,
+        shares: lot.shares,
+        purchaseNav: lot.purchaseNav,
+        rawGain,
+        rawReturnRate: lot.principal > 0 ? rawGain / lot.principal : 0,
+        returnRate: lot.principal > 0 ? gain / lot.principal : 0,
+        gain,
+      }
     })
     .filter((record): record is CashFlowRecord => record !== null)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -391,6 +431,11 @@ export function describeCashFlows(
 /** 首页要显示的几个数字 */
 export interface FundSummary {
   equity: number
+  /** 当前持有份额及其未计保底、分成的市值与盈亏，均不含已卖出部分 */
+  shares: number
+  rawEquity: number
+  rawGain: number
+  rawReturnRate: number
   /** 累计净投入的本金 */
   principal: number
   totalGain: number
@@ -417,9 +462,15 @@ export function summarize(
   const principal = fundCashFlows
     .filter((flow) => flow.date <= latest.date)
     .reduce((sum, flow) => sum + flow.amount, 0)
+  const remainingCost = latest.lots.reduce((sum, lot) => sum + lot.principal, 0)
+  const rawGain = latest.rawEquity - remainingCost
 
   return {
     equity: latest.equity,
+    shares: latest.lots.reduce((sum, lot) => sum + lot.shares, 0),
+    rawEquity: latest.rawEquity,
+    rawGain,
+    rawReturnRate: remainingCost > 0 ? rawGain / remainingCost : 0,
     principal,
     totalGain: latest.equity - principal,
     totalReturnRate: principal > 0 ? latest.equity / principal - 1 : 0,

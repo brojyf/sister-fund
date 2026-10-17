@@ -61,6 +61,13 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 的那笔有自己更高的保底线，乘出来会偏低。逐笔明细在 `FundPoint.lots`，
 `describeCashFlows` 就是从那里取数的。取钱按 FIFO 扣，见 `withdrawFifo`。
 
+**原始份额与结算账分开。** 妹妹购买管理人已有份额，购买款不进入账户，不能
+据此给账户增资或调整账户净值。固定汇率、不计汇兑损益，`purchaseNav` 是买入
+当天的 `realNav`，`shares = amount / purchaseNav`，`rawValue = shares * realNav`。
+这些原始份额跨月不重置；`rawEquity` 是原始市值，`equity` 则继续按原约定保底、
+分成和月结。`grossEquity` 用的是结算锚点，不等于跨月原始份额市值。
+卖出仍按结算价值 FIFO 回购，同时同比例扣减份额与成本；原始盈亏只报剩余持仓。
+
 **两个口径不能混。** 托管账户图画的是**总资产 ÷ 固定本金 `ACCOUNT_BASE_CAPITAL`
 （$2,000）**，是账户的绝对水位（`buildAccountReturnSeries`，只吃 `account.json`）；
 毛毛的资产曲线是**逐笔复利链 + 保底 + 抽成**加总。账户那条线上入金会显出台阶，这是刻意的，别
