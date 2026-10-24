@@ -1,139 +1,184 @@
-# 毛毛基金
+# Maomao Fund
 
-给毛毛看的每日资产曲线。收益率来自 Robinhood 账户（通过 SnapTrade 只读拉取），
-妹妹购买我已有的账户份额，购买款归我，不进入 Robinhood 账户。买入/卖出由我
-手工记账，人民币计价，按固定汇率计算、不计汇兑损益。
+A real-money fund I run for my younger sister. The point is not the money — it is
+to let her watch her own capital compound, dip and recover _every single day_,
+so that investing stops being an abstract word and becomes a number she checks
+with her morning coffee. She buys shares of an account I already own; her
+purchase money goes to me and never enters the brokerage account. I keep the
+books by hand in CNY at a fixed exchange rate and ignore FX gains and losses.
+The app is in Chinese, because she reads Chinese.
 
-## 规则
+Two rules make it safe enough to be a teaching tool:
 
-- **每天保底 0.01%**：按自然日复利，30 天约 0.30%。跑输就由我补足
-- **超额分成 50%**：跑赢保底的部分，我拿走一半
-- **保底按笔给**：每笔钱从**它自己进来那天**起单独长一条保底线，所以在高点
-  进来的钱不会因为整体回撤而显示成结算亏损。流水表里的结算收益率 ≥ 0，
-  份额原始收益率则可以为负
-- 保底线**逐日**长，但**结算单位仍是自然月**：锚点每月重置，所以上个月已兑现的
-  收益不会被这个月吃掉，这个月的分成也不会追溯上个月
+- **A guaranteed floor of 0.01% per calendar day, compounded — roughly +3.72% a
+  year** (about +0.30% a month). If the account underperforms, I top her up.
+- **A 50% performance fee** on whatever beats that floor. That is the part meant
+  to teach her the real cost of active management.
 
-保底保的是**每笔钱不跌破自己那条线**，不是「曲线永不下跌」。某一笔涨到高位
-之后回落，只要还在自己的保底线之上，跌是照跌的 —— 首页的「今日」出现负数
-是正常的。
+Everything below is how those rules are implemented.
 
-## 两份手写数据
+## Rules
 
-| 文件 | 单位 | 用途 |
+- **Floor: 0.01% per day**: compounded on calendar days, ~0.30% per 30 days and
+  ~3.72% per 365 days. I cover any shortfall.
+- **50% performance fee**: on the part above the floor, I take half.
+- **The floor is granted per lot**: every deposit grows its own floor line from
+  **the day it arrived**, so money that came in at a high point does not show up
+  as a settled loss just because the whole account pulled back. In the cash-flow
+  table the settled return rate is always ≥ 0, while the raw share return can be
+  negative.
+- The floor line grows **daily**, but **settlement is still per calendar month**:
+  the anchor resets every month, so last month's realised gains cannot be eaten
+  by this month, and this month's fee does not reach back into last month.
+
+The guarantee is that **no lot falls below its own floor line**, not that "the
+curve never goes down". If a lot climbs high and then retraces, it still falls as
+long as it stays above its own floor — a negative "today" number on the home page
+is normal.
+
+## Two hand-maintained data files
+
+| File | Unit | Purpose |
 |---|---|---|
-| `src/data/account.json` | 美元 | 账户每日总资产。今天那格 sync 写，之前的**手工填** |
-| `src/data/cash-flows.json` | 人民币 | 毛毛买入/卖回我已有份额的成交款，不是账户出入金 |
+| `src/data/account.json` | USD | Daily total account value. Today's cell is written by the sync script; every earlier cell is **typed in by hand** |
+| `src/data/cash-flows.json` | CNY | What my sister paid when buying / selling back shares I already owned — not account deposits or withdrawals |
 
-**账户负责提供涨跌幅，我负责提供本金。**
+**The account supplies the return; I supply the principal.**
 
-## 份额原始收益与结算收益
+## Raw share return vs settled return
 
-账户原始净值从首个快照归一为 **1**。妹妹每笔购买的份额为
-`买入金额 ÷ 购买当天原始净值`，从我已有的份额转让，账户总份额不变。
-按固定汇率归一记账，无需引入汇率数据；这里的份额不用于推算美元账户的实际
-持股比例。买入前的涨跌不会计入妹妹这笔钱的收益。
+The account's raw NAV is normalised to **1** on the first snapshot. Each purchase
+buys `amount ÷ raw NAV on the purchase date` shares transferred out of my own
+holdings, so the total share count never changes. The books are kept at a fixed
+exchange rate, so no FX data is needed; these shares are not meant to represent
+her real ownership percentage of the USD account. Moves from before the purchase
+do not count toward that lot's return.
 
-- **原始市值**：`剩余持有份额 × 当前原始净值`。
-- **原始盈亏 / 收益率**：`原始市值 − 剩余买入成本` / `原始盈亏 ÷ 剩余买入成本`。
-  多笔合计按剩余成本加权，不对逐笔百分比取平均。
-- **结算金额 / 收益率**：继续按原约定逐笔保底、超额分成、每月结算。
-  月末结算结果成为下月结算锚点，但不重置原始买入份额、买入净值或成本。
+- **Raw market value**: `remaining shares × current raw NAV`.
+- **Raw P&L / return rate**: `raw market value − remaining cost` / `raw P&L ÷
+  remaining cost`. Across lots it is weighted by remaining cost, never an average
+  of per-lot percentages.
+- **Settled amount / return rate**: still governed by the original deal — per-lot
+  floor, 50% fee above it, monthly settlement. The month-end result becomes next
+  month's anchor but does not reset the raw shares, purchase NAV or cost.
 
-例如账户净值 1.10 时买入 ¥1,100，对应 1,000 份；净值涨到 1.21 时，原始市值
-为 ¥1,210，原始收益率 10%。结算结果另按这笔钱的保底和分成规则计算。
-原始市值与结算金额之差不能直接当作累计分成，因为其中还包含保底补足及历月结算。
+Example: buying ¥1,100 when the NAV is 1.10 gives 1,000 shares; at 1.21 the raw
+value is ¥1,210, a 10% raw return. The settled result is computed separately from
+that lot's floor and fee rules. The gap between raw value and settled amount is
+not "cumulative fees taken", because it also contains floor top-ups and past
+monthly settlements.
 
-购买日期缺快照时沿用现有对齐规则，归到之后第一个快照日；最后一个快照之后的
-购买暂不计算。当前两笔购买当天均有快照；历史占位资产仍按现有记录计算，公式
-不会把占位值变成已核实估值。
+If a purchase date has no snapshot, the existing alignment rule applies: it is
+assigned to the first snapshot after it. Purchases after the last snapshot are
+not counted yet. Both current purchases have a snapshot on their own date; legacy
+placeholder assets are still computed by the existing record, and the formula
+does not turn a placeholder into a verified valuation.
 
-## 两个口径也不能混
+## Two measurement bases that must not be mixed
 
-| 图 | 口径 | 为什么 |
+| Chart | Basis | Why |
 |---|---|---|
-| 托管账户 | **涨跌幅**：总资产 ÷ **固定本金 $2,000** − 1，不剔资金 | 只吃 `account.json`，一句话能对着 App 心算验证 |
-| 毛毛的资产 | **按笔记账**：每笔各自的复利链 + 保底 + 抽成，再加总 | 她的钱分几次进来，每笔的保底线起点不同 |
+| Custodial account | **Return**: total value ÷ **fixed capital of $2,000** − 1, flows not removed | Reads only `account.json`, so it can be checked against the app in one mental step |
+| My sister's equity | **Per-lot bookkeeping**: each lot's own compounding chain + floor + fee, then summed | Her money came in several times, and each lot's floor starts on a different day |
 
-托管账户的基数是**起始资金 $2,000**（开张的三笔 ACH：$10 + $1,490 + $500），
-写在 `src/lib/fundData.ts` 的 `ACCOUNT_BASE_CAPITAL`。不拿第一个快照当基准 ——
-那样只要那天的数值有偏差，整条曲线就整体平移。
+The custodial account's base is the **initial capital of $2,000** (the three
+opening ACH transfers of $10 + $1,490 + $500), stored as `ACCOUNT_BASE_CAPITAL` in
+`src/lib/fundData.ts`. It deliberately does not use the first snapshot as the
+base — one bad value there would shift the whole curve.
 
-这条线回答的是「账户里的钱比投进去的本金多了多少」，是账户的绝对水位。
-入金那天会有一段台阶，看着像暴涨 —— 口径本身如此，不是算错。
+This line answers "how much more is in the account than the principal put in",
+i.e. the account's absolute water level. Deposit days show a step that looks like
+a spike; that is the basis doing its job, not a bug.
 
-## 资金流水表
+## Cash-flow table
 
-页面底部按笔列出毛毛的每次买入、剩余份额、买入净值，以及原始和结算两个口径
-的盈亏与收益率。窄屏可以横向滚动查看全部列。
-每笔钱各记各的账：从进来那天起，自己长保底线、自己算超额抽成，收益率是
-「这笔现在值多少 ÷ 还剩多少本金 − 1」—— 后进来的钱只跟了一小段，收益率天然
-低于整体涨幅，分笔看才不会误会。
+The bottom of the page lists every purchase, remaining shares, purchase NAV, and
+both raw and settled P&L / return rate. Narrow screens scroll horizontally to see
+every column. Each lot keeps its own books: it grows its own floor line and pays
+its own fee from the day it arrived, and its return rate is "what this lot is
+worth now ÷ what is left of its principal − 1". Later money has only been in for a
+short stretch, so its rate is naturally lower than the overall gain — per-lot
+columns are what keep that from looking like an error.
 
-取钱那行的收益列是「—」：钱已经拿走了，没有「到今天赚了多少」可言。取钱
-按 **FIFO** 从最早那笔扣起，扣不够再往后顺延；被扣掉一部分的那笔，剩下的
-本金、剩余份额和保底线按同比例缩，剩余部分的收益率不受影响。回购款按原有
-结算价值扣减，原始收益栏只反映仍持有部分，不包含已卖出部分的已实现盈亏。
+The return columns on a withdrawal row show "—": the money is gone, so there is
+no "gain so far". Withdrawals are matched **FIFO** from the earliest lot onward;
+a partially withdrawn lot has its remaining principal, shares and floor line
+scaled down proportionally, so the remaining part's return rate is unchanged.
+Buy-backs reduce the original settled value; the raw P&L column reflects only
+what is still held and excludes realised gains on sold shares.
 
-## 为什么不用 balanceHistory
+## Why not balanceHistory
 
-`getAccountBalanceHistory` **不是** Robinhood 的日终收盘，是 SnapTrade 拿活动列表
-从当前余额倒推出来的估算（它自己标了 experimental，而且忽略 `startDate` /
-`endDate`，每次都返回 366 天）。它返回的历史整条骑着一个**隔日翻转的
-±$51.16 伪影**，实测证据：
+`getAccountBalanceHistory` is **not** Robinhood's end-of-day close. It is an
+estimate SnapTrade back-derives from the activity list starting at the current
+balance (it is marked experimental, ignores `startDate` / `endDate`, and always
+returns 366 days). The whole returned history rides a **±$51.16 artefact that
+flips every other day**. Measured:
 
-| | 周五 | 周六 | 周日 |
+| | Friday | Saturday | Sunday |
 |---|---|---|---|
 | 7/17–19 | 2079.36 | **2130.52** | 2079.36 |
 | 8/7–9 | 2213.98 | **2162.82** | 2213.98 |
 
-市场休市，周五和周日一分不差，中间的周六却偏出去 ±51.16。
+The market was closed, Friday and Sunday match to the cent, yet Saturday in
+between is off by ±51.16.
 
-成因是**时区**：把「当前现金 − 之后所有活动」重建一遍，纯现金那一段的差值严格
-交替 `+1.16 / −50.00` —— 正好是活动列表里唯二**只有日期、没有时刻**的两条记录
-（利息 `2026-08-14T00:00:00Z`、Gold 月费 `2026-08-13T00:00:00Z`）。UTC 零点等于
-美东前一天 20:00，这两笔的日期归属在日界上摇摆，隔天算进去、隔天漏掉，偏移
-一路传播到最早一天。按美东归集时 8/12、8/13 两天能算到分毫不差。
+The cause is **time zones**: rebuilding "current cash − all later activity" makes
+the pure-cash segment alternate strictly between `+1.16 / −50.00` — exactly the
+only two records in the activity list that carry **a date but no time**
+(interest `2026-08-14T00:00:00Z`, Gold monthly fee `2026-08-13T00:00:00Z`). UTC
+midnight is 20:00 the previous day in New York, so those two entries flip between
+being counted and dropped at the day boundary, and the offset propagates all the
+way back to the earliest day. Grouped by New York days, 8/12 and 8/13 come out to
+the cent.
 
-所以 `account.json` 的历史是**手工对着 Robinhood App 填的**，不要用这个端点回填。
+That is why the history in `account.json` is **typed in by hand against the
+Robinhood app**; do not backfill it from this endpoint.
 
-## 命令
+## Commands
 
 ```bash
-npm run dev               # 本地开发
-npm test                  # 净值/保底/分成的单元测试
-npm run verify            # 打印逐日对账表，人工核对
-npm run snaptrade:sync    # 拉当天实时余额 → 追加进 src/data/account.json
-npm run snaptrade:accounts # 列出已授权账户，确认 accountId
-npm run snaptrade:connect  # 重新生成 Robinhood 授权链接（掉线时才用）
+npm run dev                # local dev server
+npm test                   # unit tests for NAV / floor / fee
+npm run verify             # print a day-by-day reconciliation table
+npm run snaptrade:sync     # fetch today's live balance → append to src/data/account.json
+npm run snaptrade:accounts # list connected accounts, confirm accountId
+npm run snaptrade:connect  # regenerate the Robinhood authorisation link (only after it drops)
 ```
 
-## 数据
+## Data
 
-- `src/data/account.json` — 账户总资产（美元）。**今天那一格由 sync 写，今天之前
-  的手改**：对着 Robinhood App 填真实总资产。2026-07-15 起的 `2000` 是占位数
-- `src/data/cash-flows.json` — **手改这个**。毛毛的加钱/取钱（人民币）
+- `src/data/account.json` — total account value in USD. **Today's cell is
+  written by sync; earlier cells are edited by hand** against the Robinhood app.
+  The `2000` values from 2026-07-15 on are placeholders.
+- `src/data/cash-flows.json` — **edit this by hand**. My sister's deposits and
+  withdrawals, in CNY.
 
-## 已知限制
+## Known limitations
 
-- **历史只能手工补**。SnapTrade 唯一的历史端点不可用（见上），所以除了每天
-  sync 沉淀下来的那一格，别的日子都得对着 App 填
-- 账户 2026-07-15 之前是空的，算不出收益率。毛毛 6/26 就给钱了，
-  这段空档在 `fundData.ts` 里补成「真实收益 0」，保底照给
-- `getUserAccountReturnRates` 端点对这个账号未开通，收益率只能自己从总资产推
-- **画不了 K 线**。账户历史每天只有一个 `total_value`，没有开高低收，
-  蜡烛图缺三个数。账户走势图是折线，跟 Robinhood App 里那条一样
-- 快照按**美东日历日**归档（`scripts/trading-day.mjs`）。用 UTC 日期的话，
-  美东 20:00 之后跑 sync 会把余额记到还没开盘的第二天
+- **History can only be filled in by hand.** The only usable history endpoint on
+  SnapTrade is broken (see above), so apart from the daily snapshot that sync
+  accumulates, every day has to be typed in from the app.
+- The account was empty before 2026-07-15, so no return can be computed there. My
+  sister gave me the money on 6/26, and that gap is filled as "0% real return" in
+  `fundData.ts`; the floor still accrues.
+- `getUserAccountReturnRates` is not enabled for this account, so the return rate
+  has to be derived from the total value.
+- **No candlesticks.** The account history has a single `total_value` per day —
+  no open/high/low/close, so a candle chart would be missing three of its four
+  numbers. The account chart is a line, like the one in the Robinhood app.
+- Snapshots are filed by **New York calendar day** (`scripts/trading-day.mjs`).
+  Using a UTC date would file a post-20:00 ET sync into a day that has not opened
+  yet.
 
-## 配置
+## Configuration
 
-`.env.local`（不进仓库）：
+`.env.local` (never committed):
 
 ```
 SNAPTRADE_CLIENT_ID=
 SNAPTRADE_CONSUMER_KEY=
 ```
 
-账户 ID 在 `scripts/config.mjs`，起始资金在 `src/lib/fundData.ts` 的
-`ACCOUNT_BASE_CAPITAL`。
+The account ID lives in `scripts/config.mjs`; the starting capital lives in
+`ACCOUNT_BASE_CAPITAL` in `src/lib/fundData.ts`.

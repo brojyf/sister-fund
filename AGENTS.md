@@ -1,13 +1,14 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents (Claude Code, Codex, pi) working on
+this repository.
 
-## 先看这个：上级目录的 CLAUDE.md 不适用于本仓库
+## 先看这个：cogate 的约定不适用于本仓库
 
-`~/Downloads/CLAUDE.md` 和 `~/Downloads/AGENTS.md` 描述的是 cogate 平台（Go /
+全局的 `~/.claude/CLAUDE.md` / `~/.pi/agent/AGENTS.md` 描述的是 cogate 平台（Go /
 Rust / gRPC / Coolify），会被自动加载进上下文，但和本仓库**毫无关系**。本仓库是
-`~/Downloads` 下一个独立的 Git 仓库，技术栈是 React + Vite + TypeScript，部署在
-Cloudflare Workers 静态资源上。除了 `~/.claude/CLAUDE.md` 里的通用工作方式，
+一个独立的 Git 仓库，技术栈是 React + Vite + TypeScript，部署在
+Cloudflare Workers 静态资源上。除了全局文件里的通用工作方式，
 其余 cogate 约定（数据所有权、幂等三原则、队列、gRPC、迁移）一条都不要往这里套。
 
 业务规则、口径解释和已知限制写在 `README.md`，本文件不重复，只讲代码怎么组织、
@@ -76,7 +77,7 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 
 **别用 `getAccountBalanceHistory` 回填历史。** 它不是日终收盘，是 SnapTrade 拿
 残缺活动列表倒推的估算，整条曲线骑着隔日翻转的 ±$51.16 时区伪影（成因和证据
-在 `README.md` 的「为什么不用 balanceHistory」）。sync 只写当天一个点，历史手工填。
+在 `README.md` 的「Why not balanceHistory」）。sync 只写当天一个点，历史手工填。
 
 **`account.json` 里只放开盘日。** 休市日余额不动，写进去只是重复点，
 `snaptrade-sync.mjs` 开头用 `isMarketClosed()` 直接退出，cron 也收成 `1-5`。假日表
