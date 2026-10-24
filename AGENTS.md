@@ -55,7 +55,8 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 混在一起测试不一定挂，但曲线会静默算错。
 
 **`equity` 不等于任何一个 nav 乘份额。** 毛毛的钱是**按笔记账**的：
-`buildFundSeries` 里每笔入金是一个 lot，锚点是它自己进来那天，跨月才重置，
+`buildFundSeries` 里每笔入金是一个 lot，起点是它自己进来那天，一直连续算到今天
+（**没有月度锚点**：结算值 = 本金 × (保底比例 + 50% × max(0, 真实比例 − 保底比例))），
 `equity` / `floorEquity` 是把所有 lot 加总出来的。`displayNav` / `grossNav` /
 `floorNav` 只是一条**参考净值**（「开张就放进去 1 块钱现在值多少」），给
 `npm run verify` 和整体口径用，**不要**拿它乘份额去还原毛毛的钱 —— 高点进来
@@ -65,9 +66,9 @@ src/App.tsx + components/{EquityChart,AccountChart}.tsx  —— 只负责画
 **原始份额与结算账分开。** 妹妹购买管理人已有份额，购买款不进入账户，不能
 据此给账户增资或调整账户净值。固定汇率、不计汇兑损益，`purchaseNav` 是买入
 当天的 `realNav`，`shares = amount / purchaseNav`，`rawValue = shares * realNav`。
-这些原始份额跨月不重置；`rawEquity` 是原始市值，`equity` 则继续按原约定保底、
-分成和月结。`grossEquity` 用的是结算锚点，不等于跨月原始份额市值。
-卖出仍按结算价值 FIFO 回购，同时同比例扣减份额与成本；原始盈亏只报剩余持仓。
+这些原始份额只用来承认「她买的时候是多少份」，不参与结算；`rawEquity` 是原始
+市值，`equity` 则按上面那条连续公式保底、分成。卖出按结算价值 FIFO 回购，
+同时同比例扣减份额与成本；原始盈亏只报剩余持仓。
 
 **两个口径不能混。** 托管账户图画的是**总资产 ÷ 固定本金 `ACCOUNT_BASE_CAPITAL`
 （$2,000）**，是账户的绝对水位（`buildAccountReturnSeries`，只吃 `account.json`）；

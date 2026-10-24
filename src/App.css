@@ -333,7 +333,6 @@
 
 .flows__table {
   width: 100%;
-  min-width: 48rem;
   border-collapse: collapse;
   font-size: 0.9rem;
 }
@@ -347,13 +346,6 @@
 
 .flows__scroll {
   overflow-x: auto;
-}
-
-.flows__nav {
-  display: block;
-  margin-top: 0.3rem;
-  color: var(--ink-faint);
-  font-size: 0.72rem;
 }
 
 .flows__table th {

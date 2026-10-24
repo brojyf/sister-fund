@@ -7,7 +7,9 @@
  *
  * **账户总资产的变动一律当成真实涨跌。** 券商层面没有单独的资金台账。
  *
- * 保底每天 0.01% 复利，超额部分抽成 50%，两者都以自然月为结算单位（锚点每月重置）。
+ * 保底每天 0.01% 复利，超额部分抽成 50%。两者都**从每笔入金当天起连续计算**：
+ * 任何一天「结算」都是 本金 × (保底比例 + 50% × max(0, 真实比例 − 保底比例))，
+ * 不存在按月重置的锚点，也不把上个月的收益锁成新起跑线。
  */
 
 /** 每日保底收益率，按自然日复利。跌破由你补足（连着 30 天就是 0.30%） */
@@ -121,7 +123,7 @@ export interface LotSnapshot {
   flowIndex: number
   /** 还留在基金里的本金，被取钱按比例扣减过 */
   principal: number
-  /** 买入时的账户原始净值，跨月不重置 */
+  /** 买入时的账户原始净值，之后不再变动 */
   purchaseNav: number
   /** 剩余持有份额；买入是从管理人转让，卖出按结算价值同比例扣减 */
   shares: number
@@ -149,9 +151,9 @@ export interface FundPoint {
   equity: number
   /** 每笔入金的保底价值加总，就是「你的资产」图上那条保底线 */
   floorEquity: number
-  /** 从当月结算锚点推进、未计本月保底和抽成的市值；不同于原始份额市值 */
+  /** 真实净值下的市值，未计保底和抽成；不同于原始份额市值 */
   grossEquity: number
-  /** 买入份额的原始市值，跨月不把结算收益混入 */
+  /** 买入份额的原始市值，只按账户净值算，不叠保底和分成 */
   rawEquity: number
   /** 当期收益：只算上一期就在场的钱涨了多少，不含这期新加的 */
   dayGain: number
@@ -174,10 +176,6 @@ function daysBetween(from: string, to: string): number {
   return (parseDate(to).getTime() - parseDate(from).getTime()) / MS_PER_DAY
 }
 
-function monthKey(date: string): string {
-  return date.slice(0, 7)
-}
-
 /**
  * 账户快照可能是隔日的（SnapTrade 的历史数据就是每 2 天一个点），
  * 所以资金变动要按「上一个快照之后、到这个快照为止」的区间归集，
@@ -195,32 +193,22 @@ function flowsInWindow(
 }
 
 /**
- * 保底锚点。每进入新的自然月，锚点重置为上月最后一天的值，于是上个月已经
- * 兑现的收益（含被保底抬上去的部分）成为新的起跑线。
+ * 一笔入金的完整记账状态。保底线从它自己进来那天起连续长，没有月度锚点。
+ * 份额、本金、买入净值三样就够定位这笔钱的真实表现，保底与抽成都由它们推出。
  */
-interface Anchor {
-  date: string
-  realNav: number
-}
-
-/** 一笔入金的完整记账状态。保底线从它自己进来那天起长，跨月才重置锚点 */
 interface Lot extends LotSnapshot {
-  anchorDate: string
-  anchorRealNav: number
-  /** 锚点日这笔钱值多少，当月所有比例都乘在它上面 */
-  anchorValue: number
+  /** 这笔钱记进基金的那天，保底线从这天起算 */
+  purchaseDate: string
   floorValue: number
   grossValue: number
   /** 真实表现跑输了自己那条保底线，靠补足托着 */
   isFloored: boolean
   feeAccrued: number
-  /** 本月已计过抽成的超额比例，跨月清零 */
-  feeCountedThisMonth: number
 }
 
 /**
  * 取钱按 FIFO 从最早那笔入金开始扣，扣不够就往后顺延。
- * 本金和锚点价值按同比例缩，这样「剩下的钱」的保底线和收益率都不受影响。
+ * 本金按同比例缩，这样「剩下的钱」的保底线和收益率都不受影响。
  */
 function withdrawFifo(lots: Lot[], amount: number): void {
   let remaining = amount
@@ -233,7 +221,6 @@ function withdrawFifo(lots: Lot[], amount: number): void {
     lot.principal *= kept
     lot.shares *= kept
     lot.rawValue *= kept
-    lot.anchorValue *= kept
     lot.floorValue *= kept
     lot.grossValue *= kept
     lot.value -= taken
@@ -249,64 +236,42 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
   const lots: Lot[] = []
   let realNav = 1
 
-  // 参考净值那条链：假设开张第一天就放进去 1 块钱。只用于展示和对账。
-  let reference: Anchor = { date: ordered[0].date, realNav: 1 }
-  let referenceDisplayNav = 1
-
   for (let i = 0; i < ordered.length; i++) {
     const { date, totalValue } = ordered[i]
     const previousDate = i > 0 ? ordered[i - 1].date : null
-    const previous = i > 0 ? points[i - 1] : null
 
-    if (previous) {
+    if (i > 0) {
       const previousValue = ordered[i - 1].totalValue
       // 账户总资产的变动全部当成真实涨跌，不剔任何券商层面的资金进出。
       const dailyReturn = previousValue > 0 ? totalValue / previousValue - 1 : 0
       realNav *= 1 + dailyReturn
-
-      if (monthKey(date) !== monthKey(previous.date)) {
-        reference = { date: previous.date, realNav: previous.realNav }
-        referenceDisplayNav = previous.displayNav
-      }
     }
 
-    // 保底逐日累加，但**结算单位是自然月**：锚点每月重置，所以上个月已兑现的
-    // 收益不会被这个月吃掉，这个月的抽成也不会追溯上个月。
+    // 参考净值：假设开张第一天就放进去 1 块钱，保底从那天起连续算到底。
+    // 只用于展示和对账，毛毛的钱是按笔记账的。
     // 用自然日天数而不是快照个数：快照断了一天，那天的保底也照给。
-    const referenceRealRatio = realNav / reference.realNav
-    const referenceFloorRatio = (1 + DAILY_FLOOR_RATE) ** daysBetween(reference.date, date)
+    const floorRatio = (1 + DAILY_FLOOR_RATE) ** daysBetween(ordered[0].date, date)
     // 跑赢保底的部分抽走一半；跑输就由保底线托住，不倒扣
-    const referenceExcess = Math.max(0, referenceRealRatio - referenceFloorRatio)
+    const excess = Math.max(0, realNav - floorRatio)
 
-    const grossNav = referenceDisplayNav * referenceRealRatio
-    const floorNav = referenceDisplayNav * referenceFloorRatio
-    const displayNav =
-      referenceDisplayNav * (referenceFloorRatio + (1 - PERFORMANCE_FEE_RATE) * referenceExcess)
+    const grossNav = realNav
+    const floorNav = floorRatio
+    const displayNav = floorRatio + (1 - PERFORMANCE_FEE_RATE) * excess
 
-    // 每笔钱各自推进一天：锚点是它自己进来那天，跨月才重置
+    // 每笔钱各自推进一天：起点是它自己进来的那天，一直连续到今天
     const valueBefore = lots.map((lot) => lot.value)
     for (const lot of lots) {
-      if (previous && monthKey(date) !== monthKey(previous.date)) {
-        lot.anchorDate = previous.date
-        lot.anchorRealNav = previous.realNav
-        lot.anchorValue = lot.value
-        lot.feeCountedThisMonth = 0
-      }
+      const lotRealRatio = realNav / lot.purchaseNav
+      const lotFloorRatio = (1 + DAILY_FLOOR_RATE) ** daysBetween(lot.purchaseDate, date)
+      const lotExcess = Math.max(0, lotRealRatio - lotFloorRatio)
 
-      const realRatio = realNav / lot.anchorRealNav
-      const floorRatio = (1 + DAILY_FLOOR_RATE) ** daysBetween(lot.anchorDate, date)
-      const excess = Math.max(0, realRatio - floorRatio)
-
-      // 超额回落时增量为负，等于把没落袋的抽成退回去
-      lot.feeAccrued +=
-        lot.anchorValue * PERFORMANCE_FEE_RATE * (excess - lot.feeCountedThisMonth)
-      lot.feeCountedThisMonth = excess
-
-      lot.floorValue = lot.anchorValue * floorRatio
-      lot.grossValue = lot.anchorValue * realRatio
+      lot.floorValue = lot.principal * lotFloorRatio
+      lot.grossValue = lot.principal * lotRealRatio
       lot.rawValue = lot.shares * realNav
-      lot.value = lot.anchorValue * (floorRatio + (1 - PERFORMANCE_FEE_RATE) * excess)
-      lot.isFloored = realRatio < floorRatio
+      lot.value = lot.principal * (lotFloorRatio + (1 - PERFORMANCE_FEE_RATE) * lotExcess)
+      // 超额回落时抽成跟着退回去，只对当下高过保底线的那部分收一半
+      lot.feeAccrued = lot.principal * PERFORMANCE_FEE_RATE * lotExcess
+      lot.isFloored = lotRealRatio < lotFloorRatio
     }
     const dayGain = lots.reduce((sum, lot, index) => sum + lot.value - valueBefore[index], 0)
 
@@ -320,14 +285,11 @@ export function buildFundSeries({ snapshots, fundCashFlows = [] }: FundInput): F
           shares: flow.amount / realNav,
           rawValue: flow.amount,
           value: flow.amount,
-          anchorDate: date,
-          anchorRealNav: realNav,
-          anchorValue: flow.amount,
+          purchaseDate: date,
           floorValue: flow.amount,
           grossValue: flow.amount,
           isFloored: false,
           feeAccrued: 0,
-          feeCountedThisMonth: 0,
         })
       } else if (flow.amount < 0) {
         withdrawFifo(lots, -flow.amount)

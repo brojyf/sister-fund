@@ -21,20 +21,22 @@ Everything below is how those rules are implemented.
 
 - **Floor: 0.01% per day**: compounded on calendar days, ~0.30% per 30 days and
   ~3.72% per 365 days. I cover any shortfall.
-- **50% performance fee**: on the part above the floor, I take half.
+- **50% performance fee**: on whatever the lot is worth above its own floor line,
+  I take half.
+- **Every lot is settled continuously from its purchase date**: a lot's value on
+  any given day is `principal × (floor ratio + 50% × max(0, real ratio − floor
+  ratio))`, where the real ratio is the account NAV relative to the NAV on the
+  purchase date. There is no month-end anchor and no monthly reset — the number
+  on the page is what it would settle for today.
 - **The floor is granted per lot**: every deposit grows its own floor line from
-  **the day it arrived**, so money that came in at a high point does not show up
-  as a settled loss just because the whole account pulled back. In the cash-flow
-  table the settled return rate is always ≥ 0, while the raw share return can be
-  negative.
-- The floor line grows **daily**, but **settlement is still per calendar month**:
-  the anchor resets every month, so last month's realised gains cannot be eaten
-  by this month, and this month's fee does not reach back into last month.
+  **the day it arrived**, so money that came in at a high point is not dragged
+  below its own line just because the whole account pulled back.
 
 The guarantee is that **no lot falls below its own floor line**, not that "the
 curve never goes down". If a lot climbs high and then retraces, it still falls as
-long as it stays above its own floor — a negative "today" number on the home page
-is normal.
+long as it stays above its own floor; if it falls below, the floor catches it and
+the performance fee charged so far shrinks back to zero — a negative "today"
+number on the home page is normal.
 
 ## Two hand-maintained data files
 
@@ -58,15 +60,16 @@ do not count toward that lot's return.
 - **Raw P&L / return rate**: `raw market value − remaining cost` / `raw P&L ÷
   remaining cost`. Across lots it is weighted by remaining cost, never an average
   of per-lot percentages.
-- **Settled amount / return rate**: still governed by the original deal — per-lot
-  floor, 50% fee above it, monthly settlement. The month-end result becomes next
-  month's anchor but does not reset the raw shares, purchase NAV or cost.
+- **Settled amount / return rate**: the deal above, computed continuously from
+  the purchase date to any given day. It does not reset the raw shares, purchase
+  NAV or cost.
 
-Example: buying ¥1,100 when the NAV is 1.10 gives 1,000 shares; at 1.21 the raw
-value is ¥1,210, a 10% raw return. The settled result is computed separately from
-that lot's floor and fee rules. The gap between raw value and settled amount is
-not "cumulative fees taken", because it also contains floor top-ups and past
-monthly settlements.
+Example: buying ¥1,100 when the NAV is 1.10 gives 1,000 shares. If the NAV later
+sits at 1.21, the raw value is ¥1,210 (a 10% raw return) while the settled amount
+is still computed from that lot's own floor and fee: after n days the floor ratio
+is `1.0001^n`, so the settled value is `¥1,100 × (1.0001^n + 50% × (1.10 −
+1.0001^n))`. The gap between raw value and settled amount is not "cumulative fees
+taken", because it also contains floor top-ups.
 
 If a purchase date has no snapshot, the existing alignment rule applies: it is
 assigned to the first snapshot after it. Purchases after the last snapshot are
@@ -92,20 +95,19 @@ a spike; that is the basis doing its job, not a bug.
 
 ## Cash-flow table
 
-The bottom of the page lists every purchase, remaining shares, purchase NAV, and
-both raw and settled P&L / return rate. Narrow screens scroll horizontally to see
-every column. Each lot keeps its own books: it grows its own floor line and pays
-its own fee from the day it arrived, and its return rate is "what this lot is
-worth now ÷ what is left of its principal − 1". Later money has only been in for a
-short stretch, so its rate is naturally lower than the overall gain — per-lot
-columns are what keep that from looking like an error.
+The bottom of the page lists every purchase and withdrawal: date, amount paid or
+received, the money that lot has made so far, and its return rate. Withdrawals
+show "—" in the last two columns — the money is gone, so there is no "gain so
+far". Narrow screens scroll horizontally.
 
-The return columns on a withdrawal row show "—": the money is gone, so there is
-no "gain so far". Withdrawals are matched **FIFO** from the earliest lot onward;
-a partially withdrawn lot has its remaining principal, shares and floor line
-scaled down proportionally, so the remaining part's return rate is unchanged.
-Buy-backs reduce the original settled value; the raw P&L column reflects only
-what is still held and excludes realised gains on sold shares.
+Each lot keeps its own books: it grows its own floor line from the day it arrived,
+and its return rate is "what this lot is worth today ÷ what is left of its
+principal − 1". Later money has only been in for a short stretch, so its rate is
+naturally lower than the overall gain — per-lot rows are what keep that from
+looking like an error. Withdrawals are matched **FIFO** from the earliest lot
+onward; a partially withdrawn lot has its remaining principal, shares and floor
+line scaled down proportionally, so the remaining part's return rate is
+unchanged, and the settled value handed back already includes its floor and fee.
 
 ## Why not balanceHistory
 

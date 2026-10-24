@@ -122,18 +122,15 @@ export default function App() {
 
       <section className="flows" aria-label="资金流水">
         <h2 className="flows__title">资金流水</h2>
-        <p className="flows__holding">持有 {shareQuantity.format(summary.shares)} 份 · 原始市值 {money.format(summary.rawEquity)}</p>
+        <p className="flows__holding">持有 {shareQuantity.format(summary.shares)} 份</p>
         <div className="flows__scroll" role="region" aria-label="份额与收益明细" tabIndex={0}>
           <table className="flows__table">
             <thead>
               <tr>
                 <th scope="col">日期</th>
                 <th scope="col">买入 / 卖出</th>
-                <th scope="col">持有份额 / 买入净值</th>
-                <th scope="col">原始盈亏</th>
-                <th scope="col">原始收益率</th>
-                <th scope="col">结算收益</th>
-                <th scope="col">结算收益率</th>
+                <th scope="col">收益</th>
+                <th scope="col">收益率</th>
               </tr>
             </thead>
             <tbody>
@@ -143,14 +140,6 @@ export default function App() {
                   <td className={record.amount > 0 ? 'flows__in' : 'flows__out'}>
                     {signedMoney.format(record.amount)}
                   </td>
-                  <td>
-                    {record.shares === null ? '—' : shareQuantity.format(record.shares)}
-                    {record.purchaseNav !== null && (
-                      <small className="flows__nav">净值 {record.purchaseNav.toFixed(4)}</small>
-                    )}
-                  </td>
-                  <td>{record.rawGain === null ? '—' : signedMoney.format(record.rawGain)}</td>
-                  <td>{record.rawReturnRate === null ? '—' : percent.format(record.rawReturnRate)}</td>
                   <td>{record.gain === null ? '—' : signedMoney.format(record.gain)}</td>
                   <td>{record.returnRate === null ? '—' : percent.format(record.returnRate)}</td>
                 </tr>
@@ -181,9 +170,9 @@ export default function App() {
             购买的是管理人已有的份额，购买款不进入托管账户，总份额不变。买入金额除以当天账户原始净值得到份额，买入前的涨跌与你无关。
           </li>
           <li>
-            <strong>原始收益与结算收益</strong>
+            <strong>收益怎么算</strong>
             <span className="rules__dash">——</span>
-            持有份额乘以当前账户净值得到原始市值，减去剩余买入成本才是原始盈亏，可以为负；结算收益保留每日保底和超额分成，按自然月结算，上月结算收益继续参与下月计算。
+            每笔钱从买入那天起单独计算：跑输保底线时按保底线结算，差额由管理人补足；跑赢时超出保底的部分管理人分走一半。不按月重置，任何时候都按当天的数结算。
           </li>
           <li>
             <strong>每天自动更新</strong>

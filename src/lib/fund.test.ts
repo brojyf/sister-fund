@@ -92,7 +92,7 @@ describe('按当天账户净值转让已有份额', () => {
     expect(record.returnRate).toBeCloseTo(DAILY_FLOOR_RATE, 10)
   })
 
-  it('原始份额跨月不重置，结算金额继续保底并复投上月收益', () => {
+  it('原始份额始终按买入净值计价，结算金额从买入日连续保底', () => {
     const flows = [{ date: '2026-01-01', amount: 1_000 }]
     const points = buildFundSeries({
       snapshots: [
@@ -103,13 +103,14 @@ describe('按当天账户净值转让已有份额', () => {
       fundCashFlows: flows,
     })
     const last = points[2]
-    const januaryFloor = 1.0001 ** 30
-    const januaryValue = 1_000 * (januaryFloor + 0.5 * (1.1 - januaryFloor))
+    // 2 月账户走平，但保底线照样从买入日长到 58 天，结算值不按月重置
+    const floor = 1.0001 ** 58
+    const settled = 1_000 * (floor + 0.5 * (1.1 - floor))
 
     expect(last.lots[0].shares).toBeCloseTo(1_000, 10)
     expect(last.lots[0].purchaseNav).toBe(1)
     expect(last.rawEquity).toBeCloseTo(1_100, 8)
-    expect(last.equity).toBeCloseTo(januaryValue * 1.0001 ** 28, 8)
+    expect(last.equity).toBeCloseTo(settled, 8)
     expect(describeCashFlows(points, flows)[0].rawReturnRate).toBeCloseTo(0.1, 10)
   })
 
@@ -323,8 +324,8 @@ describe('超额分成', () => {
     expect(lateTopUp[30].feeAccrued).toBeCloseTo(early[30].feeAccrued, 6)
   })
 
-  it('亏损月不倒扣，也不产生负抽成', () => {
-    // 1 月涨 10% 抽成，2 月大跌
+  it('回撒跌破保底时不再抽成，抽成随超额归零', () => {
+    // 1 月涨 10% 抽成，2 月大跌跌回保底线以下
     const january = ramp('2026-01-01', 31, 5_000, 0)
     january.forEach((snapshot, i) => {
       snapshot.totalValue = 5_000 * 1.1 ** (i / 30)
@@ -338,15 +339,16 @@ describe('超额分成', () => {
     const januaryClose = points[30]
     const februaryClose = points[points.length - 1]
 
-    // 2 月贴保底线走，1 月抽的成不退回，但也不再增加
+    // 2 月真实表现跌到保底线以下：余额靠保底托着，超额不倒扣，也不再抽成
     expect(februaryClose.isFloored).toBe(true)
-    expect(februaryClose.feeAccrued).toBeCloseTo(januaryClose.feeAccrued, 8)
-    expect(februaryClose.displayNav).toBeCloseTo(januaryClose.displayNav * 1.0001 ** 28, 6)
+    expect(januaryClose.feeAccrued).toBeGreaterThan(0)
+    expect(februaryClose.feeAccrued).toBeCloseTo(0, 8)
+    expect(februaryClose.equity).toBeCloseTo(10_000 * 1.0001 ** 58, 8)
   })
 })
 
-describe('跨月保底重置', () => {
-  it('坏月份不侵蚀上个月已兑现的收益', () => {
+describe('保底从买入日起连续计算', () => {
+  it('账户走平时，结算值跟着买入日那条保底线走', () => {
     const january = ramp('2026-01-01', 31, 10_000, 0)
     january.forEach((snapshot, i) => {
       snapshot.totalValue = 10_000 * 1.1 ** (i / 30)
@@ -360,16 +362,16 @@ describe('跨月保底重置', () => {
     const januaryClose = points[30]
     const februaryClose = points[points.length - 1]
 
+    // 真实净值一直停在 1.1，保底线从买入日跑到 58 天，结算值随之抬高
     const januaryFloor = 1.0001 ** 30
-    const januaryNav = januaryFloor + 0.5 * (1.1 - januaryFloor)
-    expect(januaryClose.displayNav).toBeCloseTo(januaryNav, 6)
+    const februaryFloor = 1.0001 ** 58
+    expect(januaryClose.displayNav).toBeCloseTo(januaryFloor + 0.5 * (1.1 - januaryFloor), 6)
     expect(januaryClose.isFloored).toBe(false)
-    // 2 月锚点是 1 月抽成后的净值，保底叠加在它之上
-    expect(februaryClose.displayNav).toBeCloseTo(januaryNav * 1.0001 ** 28, 6)
-    expect(februaryClose.isFloored).toBe(true)
+    expect(februaryClose.displayNav).toBeCloseTo(februaryFloor + 0.5 * (1.1 - februaryFloor), 6)
+    expect(februaryClose.isFloored).toBe(false)
   })
 
-  it('被保底托过的月份，下个月的真实收益照常兑现', () => {
+  it('被保底托过的月份，之后的真实收益从买入日重算超额', () => {
     const january = ramp('2026-01-01', 31, 10_000, 0)
     const february = ramp('2026-02-01', 28, 10_000, 0)
     february.forEach((snapshot, i) => {
@@ -384,12 +386,10 @@ describe('跨月保底重置', () => {
     const februaryClose = points[points.length - 1]
 
     expect(januaryClose.isFloored).toBe(true)
-    // 2 月真实涨 5%，扣掉保底后的超额抽一半。
-    // 锚点是 1 月 31 日，到 2 月 28 日走了 28 个自然日
-    const februaryFloor = 1.0001 ** 28
-    const februaryRatio = februaryFloor + 0.5 * (1.05 - februaryFloor)
+    // 真实净值 1.05，保底从买入日跑了 58 天，超出部分一次性抽一半
+    const februaryFloor = 1.0001 ** 58
     expect(februaryClose.displayNav).toBeCloseTo(
-      januaryClose.displayNav * februaryRatio,
+      februaryFloor + 0.5 * (1.05 - februaryFloor),
       6,
     )
     expect(februaryClose.isFloored).toBe(false)
@@ -651,7 +651,7 @@ describe('summarizeAccountReturn', () => {
 
 
 describe('保底按笔给：每笔钱从自己进来那天起各长各的', () => {
-  /** 涨到 1-06 见顶，1-07 回撤 —— 全在同一个自然月内，不触发跨月重置 */
+  /** 涨到 1-06 见顶，1-07 回撤 —— 高点进来的那笔只有 1 天保底 */
   const peakThenDrop: AccountSnapshot[] = [
     { date: '2026-01-05', totalValue: 2_000 },
     { date: '2026-01-06', totalValue: 2_100 },
