@@ -71,10 +71,6 @@ export default function App() {
           <span className="delta__divider" aria-hidden="true" />
           <span className="delta">{percent.format(summary.totalReturnRate)}</span>
         </p>
-        <p className="hero__raw">
-          持有份额原始盈亏 {signedMoney.format(summary.rawGain)}（{percent.format(summary.rawReturnRate)}）
-          <span>未计保底与分成</span>
-        </p>
       </section>
 
       <section className="panel" aria-label="你的资产">

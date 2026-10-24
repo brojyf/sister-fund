@@ -109,20 +109,6 @@
   font-size: 0.95rem;
 }
 
-.hero__raw {
-  margin: 0.8rem 0 0;
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-}
-
-.hero__raw span {
-  display: block;
-  margin-top: 0.3rem;
-  font-size: 0.75rem;
-  color: var(--ink-faint);
-}
-
 .delta {
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
