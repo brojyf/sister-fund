@@ -35,4 +35,40 @@ describe('账户快照按天沉淀', () => {
 
     expect(mergeSnapshots(recorded, null)).toEqual(recorded)
   })
+
+  it('2026-10-30 美东日期之前不矫正余额', () => {
+    expect(mergeSnapshots([], { date: '2026-10-29', totalValue: 4_112.97 })).toEqual([
+      { date: '2026-10-29', totalValue: 4_112.97 },
+    ])
+  })
+
+  it.each(['2026-10-30', '2026-11-02', '2027-01-04'])(
+    '%s 的原始余额固定减去 2,000 美元，保留到分',
+    (date) => {
+      expect(mergeSnapshots([], { date, totalValue: 4_112.97 })).toEqual([
+        { date, totalValue: 2_112.97 },
+      ])
+    },
+  )
+
+  it('重复同步使用新原始余额，不累计扣减，也不改写历史', () => {
+    const history = [
+      { date: '2026-10-29', totalValue: 2_100 },
+      { date: '2026-10-30', totalValue: 2_112.97 },
+    ]
+    const live = { date: '2026-11-02', totalValue: 4_200 }
+    const first = mergeSnapshots(history, live)
+    expect(mergeSnapshots(first, live)).toEqual(first)
+
+    const refreshed = mergeSnapshots(first, { date: live.date, totalValue: 4_250.50 })
+    expect(refreshed).toEqual([
+      ...history,
+      { date: '2026-11-02', totalValue: 2_250.50 },
+    ])
+    expect(history).toEqual([
+      { date: '2026-10-29', totalValue: 2_100 },
+      { date: '2026-10-30', totalValue: 2_112.97 },
+    ])
+    expect(live).toEqual({ date: '2026-11-02', totalValue: 4_200 })
+  })
 })

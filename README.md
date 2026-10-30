@@ -45,6 +45,12 @@ number on the home page is normal.
 | `src/data/account.json` | USD | Daily total account value. Today's cell is written by the sync script; every earlier cell is **typed in by hand** |
 | `src/data/cash-flows.json` | CNY | What my sister paid when buying / selling back shares I already owned — not account deposits or withdrawals |
 
+From **2026-10-30 (New York calendar date)** onward, sync records the live
+account total **minus a fixed $2,000**, rounded to cents. Earlier snapshots stay
+unchanged. Each sync applies the correction to the fresh API balance, so reruns
+do not accumulate deductions. Both charts and my sister's valuation use the
+corrected snapshots; the $2,000 base capital stays unchanged.
+
 **The account supplies the return; I supply the principal.**
 
 ## Raw share return vs settled return

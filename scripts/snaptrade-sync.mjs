@@ -7,6 +7,7 @@
  * SnapTrade 倒推的估算，不是 Robinhood 的日终收盘，成因和证据见 README
  * 「为什么不用 balanceHistory」。历史那段是手工核对后写进 account.json 的，
  * 这个脚本不会碰它。
+ * 美东 2026-10-30 起，实时总资产固定减去 $2,000 后记录。
  *
  * 毛毛的本金和加钱/取钱在 src/data/cash-flows.json，手写，脚本不碰。
  */
@@ -61,6 +62,7 @@ if (!Number.isFinite(totalValue)) {
 }
 
 const snapshots = mergeSnapshots(recorded, { date: today, totalValue })
+const recordedValue = snapshots.find((point) => point.date === today).totalValue
 
 mkdirSync(new URL('../src/data/', import.meta.url), { recursive: true })
 writeFileSync(
@@ -73,7 +75,7 @@ writeFileSync(
 )
 
 console.log(
-  `${today}（美东）总资产 ${totalValue.toFixed(2)}，` +
+  `${today}（美东）原始总资产 ${totalValue.toFixed(2)}，入账余额 ${recordedValue.toFixed(2)}，` +
     `快照 ${snapshots.length} 个：${snapshots[0].date} → ${snapshots[snapshots.length - 1].date}`,
 )
 console.log('已写入 src/data/account.json')
