@@ -17,7 +17,7 @@ it('snapshot refresh flows into fund valuation without duplicating a day', () =>
   expect(history).toEqual([{ date: '2026-08-17', totalValue: 2_000 }])
 })
 
-it('矫正后的余额同时进入账户曲线和妹妹净值，历史不受影响', () => {
+it('原始余额同时进入账户曲线和妹妹净值，历史不受影响', () => {
   const history = [{ date: '2026-10-29', totalValue: 2_000 }]
   const snapshots = mergeSnapshots(history, { date: '2026-10-30', totalValue: 4_200 })
   const points = buildFundSeries({
@@ -28,9 +28,9 @@ it('矫正后的余额同时进入账户曲线和妹妹净值，历史不受影�
 
   expect(snapshots).toEqual([
     ...history,
-    { date: '2026-10-30', totalValue: 2_200 },
+    { date: '2026-10-30', totalValue: 4_200 },
   ])
-  expect(points.at(-1)?.realNav).toBeCloseTo(1.1, 10)
-  expect(accountPoints.at(-1)?.returnRate).toBeCloseTo(0.1, 10)
+  expect(points.at(-1)?.realNav).toBeCloseTo(2.1, 10)
+  expect(accountPoints.at(-1)?.returnRate).toBeCloseTo(1.1, 10)
   expect(history).toEqual([{ date: '2026-10-29', totalValue: 2_000 }])
 })

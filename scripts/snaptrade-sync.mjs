@@ -7,7 +7,7 @@
  * SnapTrade 倒推的估算，不是 Robinhood 的日终收盘，成因和证据见 README
  * 「为什么不用 balanceHistory」。历史那段是手工核对后写进 account.json 的，
  * 这个脚本不会碰它。
- * 美东 2026-10-30 起，实时总资产固定减去 $2,000 后记录。
+ * 实时总资产原样记录，不做固定金额扣减。
  *
  * 毛毛的本金和加钱/取钱在 src/data/cash-flows.json，手写，脚本不碰。
  */

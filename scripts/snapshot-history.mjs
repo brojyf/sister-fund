@@ -7,22 +7,19 @@
  * ±$51.16 伪影（成因见 README「为什么不用 balanceHistory」）。
  *
  * 已落盘的点不许被改写（否则手工核对过的真实值会被冲掉），当天那一格可以刷新。
- * 从美东 2026-10-30 起，新实时余额固定减去 $2,000 后入账，历史不再扣减。
+ * 实时总资产原样入账，不做固定金额扣减。
  */
 
 /**
  * @typedef {{ date: string, totalValue: number }} Snapshot
  * @param {Snapshot[]} recorded 仓库里已经落盘的快照
- * @param {Snapshot | null} live 当天未经矫正的实时余额，日期为美东日历日
+ * @param {Snapshot | null} live 当天的实时余额，日期为美东日历日
  * @returns {Snapshot[]} 按日期升序
  */
 export function mergeSnapshots(recorded, live) {
   const byDate = new Map(recorded.map((point) => [point.date, point]))
   if (live) {
-    const snapshot = live.date >= '2026-10-30'
-      ? { ...live, totalValue: Math.round((live.totalValue - 2_000) * 100) / 100 }
-      : live
-    byDate.set(live.date, snapshot)
+    byDate.set(live.date, live)
   }
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
